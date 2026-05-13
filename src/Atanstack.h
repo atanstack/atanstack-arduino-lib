@@ -31,8 +31,25 @@ class AtanstackClient {
   bool begin(const AtanstackConfig& config);
   bool connect();
   void loop();
-  bool connected() const;
+  bool connected();
 
+  JsonObject data(const char* key, const char* value);
+  JsonObject data(const char* key, const String& value);
+  JsonObject data(const char* key, int value);
+  JsonObject data(const char* key, long value);
+  JsonObject data(const char* key, float value);
+  JsonObject data(const char* key, double value);
+  JsonObject data(const char* key, bool value);
+
+  JsonObject meta(const char* key, const char* value);
+  JsonObject meta(const char* key, const String& value);
+  JsonObject meta(const char* key, int value);
+  JsonObject meta(const char* key, long value);
+  JsonObject meta(const char* key, float value);
+  JsonObject meta(const char* key, double value);
+  JsonObject meta(const char* key, bool value);
+
+  bool send(const char* eventType);
   bool send(const char* eventType, JsonObject data, JsonObject meta = JsonObject());
   const char* lastError() const;
 
@@ -41,9 +58,16 @@ class AtanstackClient {
   AtanstackConfig _config;
   unsigned long _lastReconnectAttemptMs;
   String _lastError;
+  DynamicJsonDocument _pendingDataDoc;
+  DynamicJsonDocument _pendingMetaDoc;
 
   bool validateConfig(const AtanstackConfig& config);
   bool validateSendArgs(const char* eventType, JsonObject data);
+  bool validateKey(const char* key);
+  bool isPendingDocReady(const DynamicJsonDocument& doc);
+  void clearPending();
+  JsonObject pendingData();
+  JsonObject pendingMeta();
   bool buildTopic(const char* eventType, String& outTopic) const;
   void setError(const char* message);
 };

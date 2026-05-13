@@ -1,7 +1,7 @@
 // Use case:
 // Baseline ESP32 integration for AtanStack.
 // Use this when you want to connect an ESP32 over WiFi and periodically send
-// standard microcontroller data events (data + optional meta) with minimal setup.
+// standard sensor data events (data + optional meta) with minimal setup.
 
 #include <WiFi.h>
 #include <ArduinoJson.h>
@@ -34,14 +34,11 @@ void setup() {
 void loop() {
   atanstack.loop();
 
-  StaticJsonDocument<128> dataDoc;
-  dataDoc["temperature_c"] = 29.1;
-  dataDoc["battery_pct"] = 82;
+  const JsonObject temperature = atanstack.data("temperature_c", 29.1);
+  atanstack.data("battery_pct", 82);
+  atanstack.meta("firmware", "0.1.0");
+  atanstack.meta("board", "esp32");
 
-  StaticJsonDocument<96> metaDoc;
-  metaDoc["firmware"] = "0.1.0";
-  metaDoc["board"] = "esp32";
-
-  atanstack.send("sensor-data", dataDoc.as<JsonObject>(), metaDoc.as<JsonObject>());
+  atanstack.send("sensor-data", temperature);
   delay(5000);
 }

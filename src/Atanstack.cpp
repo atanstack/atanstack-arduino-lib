@@ -1,7 +1,11 @@
 #include "Atanstack.h"
 
 AtanstackClient::AtanstackClient(Client& networkClient)
-    : _mqtt(networkClient), _lastReconnectAttemptMs(0), _lastError("") {}
+    : _mqtt(networkClient),
+      _lastReconnectAttemptMs(0),
+      _lastError(""),
+      _pendingDataDoc(0),
+      _pendingMetaDoc(0) {}
 
 bool AtanstackClient::begin(const AtanstackConfig& config) {
   if (!validateConfig(config)) {
@@ -11,6 +15,9 @@ bool AtanstackClient::begin(const AtanstackConfig& config) {
   _config = config;
   _mqtt.setServer(_config.brokerHost, _config.brokerPort);
   _mqtt.setBufferSize((uint16_t)_config.maxPayloadBytes);
+  _pendingDataDoc = DynamicJsonDocument(_config.maxPayloadBytes);
+  _pendingMetaDoc = DynamicJsonDocument(_config.maxPayloadBytes / 2);
+  clearPending();
   _lastError = "";
   return true;
 }
@@ -53,7 +60,143 @@ void AtanstackClient::loop() {
   connect();
 }
 
-bool AtanstackClient::connected() const { return _mqtt.connected(); }
+bool AtanstackClient::connected() { return _mqtt.connected(); }
+
+JsonObject AtanstackClient::data(const char* key, const char* value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingData();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::data(const char* key, const String& value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingData();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::data(const char* key, int value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingData();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::data(const char* key, long value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingData();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::data(const char* key, float value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingData();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::data(const char* key, double value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingData();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::data(const char* key, bool value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingData();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::meta(const char* key, const char* value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingMeta();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::meta(const char* key, const String& value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingMeta();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::meta(const char* key, int value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingMeta();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::meta(const char* key, long value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingMeta();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::meta(const char* key, float value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingMeta();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::meta(const char* key, double value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingMeta();
+  obj[key] = value;
+  return obj;
+}
+
+JsonObject AtanstackClient::meta(const char* key, bool value) {
+  if (!validateKey(key)) {
+    return JsonObject();
+  }
+  JsonObject obj = pendingMeta();
+  obj[key] = value;
+  return obj;
+}
+
+bool AtanstackClient::send(const char* eventType) {
+  JsonObject dataObj = pendingData();
+  JsonObject metaObj = pendingMeta();
+  bool ok = send(eventType, dataObj, metaObj);
+  if (ok) {
+    clearPending();
+  }
+  return ok;
+}
 
 bool AtanstackClient::send(const char* eventType, JsonObject data, JsonObject meta) {
   if (!validateSendArgs(eventType, data)) {
@@ -143,6 +286,47 @@ bool AtanstackClient::validateSendArgs(const char* eventType, JsonObject data) {
     return false;
   }
   return true;
+}
+
+bool AtanstackClient::validateKey(const char* key) {
+  if (key == nullptr || strlen(key) == 0) {
+    setError("missing_key");
+    return false;
+  }
+  return true;
+}
+
+bool AtanstackClient::isPendingDocReady(const DynamicJsonDocument& doc) {
+  if (doc.capacity() == 0) {
+    setError("client_not_initialized");
+    return false;
+  }
+  return true;
+}
+
+void AtanstackClient::clearPending() {
+  if (_pendingDataDoc.capacity() > 0) {
+    _pendingDataDoc.clear();
+    _pendingDataDoc.to<JsonObject>();
+  }
+  if (_pendingMetaDoc.capacity() > 0) {
+    _pendingMetaDoc.clear();
+    _pendingMetaDoc.to<JsonObject>();
+  }
+}
+
+JsonObject AtanstackClient::pendingData() {
+  if (!isPendingDocReady(_pendingDataDoc)) {
+    return JsonObject();
+  }
+  return _pendingDataDoc.as<JsonObject>();
+}
+
+JsonObject AtanstackClient::pendingMeta() {
+  if (!isPendingDocReady(_pendingMetaDoc)) {
+    return JsonObject();
+  }
+  return _pendingMetaDoc.as<JsonObject>();
 }
 
 bool AtanstackClient::buildTopic(const char* eventType, String& outTopic) const {
