@@ -35,10 +35,10 @@ void loop() {
   atanstack.loop();
 
   const JsonObject temperature = atanstack.data("temperature_c", 29.1);
-  atanstack.data("battery_pct", 82);
-  atanstack.meta("firmware", "0.1.0");
-  atanstack.meta("board", "esp32");
+  const JsonObject temperature_meta = atanstack.meta("firmware", "0.1.0");
+  const JsonObject distance = atanstack.data("distance", 30.0);
 
-  atanstack.send("sensor-data", temperature);
+  atanstack.send("temperature-data", temperature, temperature_meta);
+  atanstack.send("distance-sensor", distance);
   delay(5000);
 }

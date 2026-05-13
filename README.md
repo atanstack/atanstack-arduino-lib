@@ -6,9 +6,8 @@ Arduino library for publishing device events from ESP32/ESP8266 to AtanStack dat
 
 - Simple API:
   - `atanstack.begin(config)`
-  - `atanstack.send(eventType)`
   - `atanstack.send(eventType, dataJson, metaJson?)`
-- Lightweight JSON building helpers:
+- Lightweight JSON builders:
   - `atanstack.data(key, value)`
   - `atanstack.meta(key, value)`
 - Uses `device_pid` as MQTT username.
@@ -45,27 +44,22 @@ void loop() {
   atanstack.loop();
 
   const JsonObject data = atanstack.data("temperature_c", 29.1);
-  atanstack.data("battery_pct", 82);
-  atanstack.meta("firmware", "0.1.0");
-  atanstack.meta("board", "esp32");
+  const JsonObject meta = atanstack.meta("firmware", "0.1.0");
 
-  atanstack.send("sensor-data", data);
+  atanstack.send("sensor-data", data, meta);
 }
 ```
 
-## Alternate Send Styles
-
-Use pending buffers and send directly:
+## Multiple Event Objects
 
 ```cpp
-atanstack.data("temperature_c", 29.1);
-atanstack.data("battery_pct", 82);
-atanstack.meta("firmware", "0.1.0");
-atanstack.send("sensor-data");
-```
+const JsonObject temperature = atanstack.data("temperature_c", 29.1);
+const JsonObject temperatureMeta = atanstack.meta("firmware", "0.1.0");
+const JsonObject distance = atanstack.data("distance", 30.0);
 
-On successful `send(eventType)`, pending data/meta is cleared.
-On failed `send(eventType)`, pending data/meta is retained for retry.
+atanstack.send("sensor-data", temperature, temperatureMeta);
+atanstack.send("distance-sensor", distance);
+```
 
 ## Supported Value Types
 
@@ -89,8 +83,8 @@ Every send publishes:
   "event_type": "sensor-data",
   "timestamp": "1970-01-01T00:00:00Z",
   "schema_version": 1,
-  "data": {"temperature_c": 29.1, "battery_pct": 82},
-  "meta": {"firmware": "0.1.0", "board": "esp32"}
+  "data": {"temperature_c": 29.1},
+  "meta": {"firmware": "0.1.0"}
 }
 ```
 

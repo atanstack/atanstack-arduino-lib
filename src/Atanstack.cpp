@@ -4,8 +4,13 @@ AtanstackClient::AtanstackClient(Client& networkClient)
     : _mqtt(networkClient),
       _lastReconnectAttemptMs(0),
       _lastError(""),
-      _pendingDataDoc(0),
-      _pendingMetaDoc(0) {}
+      _nextDataSlot(0),
+      _nextMetaSlot(0) {
+  for (uint8_t i = 0; i < kSlotCount; ++i) {
+    _dataSlots[i] = nullptr;
+    _metaSlots[i] = nullptr;
+  }
+}
 
 bool AtanstackClient::begin(const AtanstackConfig& config) {
   if (!validateConfig(config)) {
@@ -15,9 +20,20 @@ bool AtanstackClient::begin(const AtanstackConfig& config) {
   _config = config;
   _mqtt.setServer(_config.brokerHost, _config.brokerPort);
   _mqtt.setBufferSize((uint16_t)_config.maxPayloadBytes);
-  _pendingDataDoc = DynamicJsonDocument(_config.maxPayloadBytes);
-  _pendingMetaDoc = DynamicJsonDocument(_config.maxPayloadBytes / 2);
-  clearPending();
+  for (uint8_t i = 0; i < kSlotCount; ++i) {
+    if (_dataSlots[i] != nullptr) {
+      delete _dataSlots[i];
+    }
+    if (_metaSlots[i] != nullptr) {
+      delete _metaSlots[i];
+    }
+    _dataSlots[i] = new DynamicJsonDocument(_config.maxPayloadBytes);
+    _metaSlots[i] = new DynamicJsonDocument(_config.maxPayloadBytes / 2);
+    _dataSlots[i]->to<JsonObject>();
+    _metaSlots[i]->to<JsonObject>();
+  }
+  _nextDataSlot = 0;
+  _nextMetaSlot = 0;
   _lastError = "";
   return true;
 }
@@ -66,7 +82,7 @@ JsonObject AtanstackClient::data(const char* key, const char* value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingData();
+  JsonObject obj = nextDataObject();
   obj[key] = value;
   return obj;
 }
@@ -75,7 +91,7 @@ JsonObject AtanstackClient::data(const char* key, const String& value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingData();
+  JsonObject obj = nextDataObject();
   obj[key] = value;
   return obj;
 }
@@ -84,7 +100,7 @@ JsonObject AtanstackClient::data(const char* key, int value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingData();
+  JsonObject obj = nextDataObject();
   obj[key] = value;
   return obj;
 }
@@ -93,7 +109,7 @@ JsonObject AtanstackClient::data(const char* key, long value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingData();
+  JsonObject obj = nextDataObject();
   obj[key] = value;
   return obj;
 }
@@ -102,7 +118,7 @@ JsonObject AtanstackClient::data(const char* key, float value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingData();
+  JsonObject obj = nextDataObject();
   obj[key] = value;
   return obj;
 }
@@ -111,7 +127,7 @@ JsonObject AtanstackClient::data(const char* key, double value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingData();
+  JsonObject obj = nextDataObject();
   obj[key] = value;
   return obj;
 }
@@ -120,7 +136,7 @@ JsonObject AtanstackClient::data(const char* key, bool value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingData();
+  JsonObject obj = nextDataObject();
   obj[key] = value;
   return obj;
 }
@@ -129,7 +145,7 @@ JsonObject AtanstackClient::meta(const char* key, const char* value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingMeta();
+  JsonObject obj = nextMetaObject();
   obj[key] = value;
   return obj;
 }
@@ -138,7 +154,7 @@ JsonObject AtanstackClient::meta(const char* key, const String& value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingMeta();
+  JsonObject obj = nextMetaObject();
   obj[key] = value;
   return obj;
 }
@@ -147,7 +163,7 @@ JsonObject AtanstackClient::meta(const char* key, int value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingMeta();
+  JsonObject obj = nextMetaObject();
   obj[key] = value;
   return obj;
 }
@@ -156,7 +172,7 @@ JsonObject AtanstackClient::meta(const char* key, long value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingMeta();
+  JsonObject obj = nextMetaObject();
   obj[key] = value;
   return obj;
 }
@@ -165,7 +181,7 @@ JsonObject AtanstackClient::meta(const char* key, float value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingMeta();
+  JsonObject obj = nextMetaObject();
   obj[key] = value;
   return obj;
 }
@@ -174,7 +190,7 @@ JsonObject AtanstackClient::meta(const char* key, double value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingMeta();
+  JsonObject obj = nextMetaObject();
   obj[key] = value;
   return obj;
 }
@@ -183,19 +199,9 @@ JsonObject AtanstackClient::meta(const char* key, bool value) {
   if (!validateKey(key)) {
     return JsonObject();
   }
-  JsonObject obj = pendingMeta();
+  JsonObject obj = nextMetaObject();
   obj[key] = value;
   return obj;
-}
-
-bool AtanstackClient::send(const char* eventType) {
-  JsonObject dataObj = pendingData();
-  JsonObject metaObj = pendingMeta();
-  bool ok = send(eventType, dataObj, metaObj);
-  if (ok) {
-    clearPending();
-  }
-  return ok;
 }
 
 bool AtanstackClient::send(const char* eventType, JsonObject data, JsonObject meta) {
@@ -296,37 +302,28 @@ bool AtanstackClient::validateKey(const char* key) {
   return true;
 }
 
-bool AtanstackClient::isPendingDocReady(const DynamicJsonDocument& doc) {
-  if (doc.capacity() == 0) {
+JsonObject AtanstackClient::nextDataObject() {
+  DynamicJsonDocument* slot = _dataSlots[_nextDataSlot];
+  if (slot == nullptr || slot->capacity() == 0) {
     setError("client_not_initialized");
-    return false;
-  }
-  return true;
-}
-
-void AtanstackClient::clearPending() {
-  if (_pendingDataDoc.capacity() > 0) {
-    _pendingDataDoc.clear();
-    _pendingDataDoc.to<JsonObject>();
-  }
-  if (_pendingMetaDoc.capacity() > 0) {
-    _pendingMetaDoc.clear();
-    _pendingMetaDoc.to<JsonObject>();
-  }
-}
-
-JsonObject AtanstackClient::pendingData() {
-  if (!isPendingDocReady(_pendingDataDoc)) {
     return JsonObject();
   }
-  return _pendingDataDoc.as<JsonObject>();
+  slot->clear();
+  JsonObject obj = slot->to<JsonObject>();
+  _nextDataSlot = (_nextDataSlot + 1) % kSlotCount;
+  return obj;
 }
 
-JsonObject AtanstackClient::pendingMeta() {
-  if (!isPendingDocReady(_pendingMetaDoc)) {
+JsonObject AtanstackClient::nextMetaObject() {
+  DynamicJsonDocument* slot = _metaSlots[_nextMetaSlot];
+  if (slot == nullptr || slot->capacity() == 0) {
+    setError("client_not_initialized");
     return JsonObject();
   }
-  return _pendingMetaDoc.as<JsonObject>();
+  slot->clear();
+  JsonObject obj = slot->to<JsonObject>();
+  _nextMetaSlot = (_nextMetaSlot + 1) % kSlotCount;
+  return obj;
 }
 
 bool AtanstackClient::buildTopic(const char* eventType, String& outTopic) const {

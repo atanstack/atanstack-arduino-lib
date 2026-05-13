@@ -49,25 +49,26 @@ class AtanstackClient {
   JsonObject meta(const char* key, double value);
   JsonObject meta(const char* key, bool value);
 
-  bool send(const char* eventType);
   bool send(const char* eventType, JsonObject data, JsonObject meta = JsonObject());
   const char* lastError() const;
 
  private:
+  static const uint8_t kSlotCount = 8;
+
   PubSubClient _mqtt;
   AtanstackConfig _config;
   unsigned long _lastReconnectAttemptMs;
   String _lastError;
-  DynamicJsonDocument _pendingDataDoc;
-  DynamicJsonDocument _pendingMetaDoc;
+  DynamicJsonDocument* _dataSlots[kSlotCount];
+  DynamicJsonDocument* _metaSlots[kSlotCount];
+  uint8_t _nextDataSlot;
+  uint8_t _nextMetaSlot;
 
   bool validateConfig(const AtanstackConfig& config);
   bool validateSendArgs(const char* eventType, JsonObject data);
   bool validateKey(const char* key);
-  bool isPendingDocReady(const DynamicJsonDocument& doc);
-  void clearPending();
-  JsonObject pendingData();
-  JsonObject pendingMeta();
+  JsonObject nextDataObject();
+  JsonObject nextMetaObject();
   bool buildTopic(const char* eventType, String& outTopic) const;
   void setError(const char* message);
 };

@@ -1,7 +1,7 @@
 // Use case:
 // Baseline ESP8266 integration for AtanStack.
 // Use this when you want to connect an ESP8266 over WiFi and publish
-// simple sensor data events with the default AtanStack topic structure.
+// sensor data events with explicit data/meta objects.
 
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
@@ -35,8 +35,8 @@ void loop() {
   atanstack.loop();
 
   const JsonObject data = atanstack.data("humidity_pct", 67.4);
-  atanstack.data("relay_on", true);
+  const JsonObject meta = atanstack.meta("relay_on", true);
 
-  atanstack.send("sensor-data", data);
+  atanstack.send("sensor-data", data, meta);
   delay(5000);
 }
