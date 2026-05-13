@@ -1,4 +1,4 @@
-#include "AtanstackMQTT.h"
+#include "Atanstack.h"
 
 AtanstackClient::AtanstackClient(Client& networkClient)
     : _mqtt(networkClient), _lastReconnectAttemptMs(0), _lastError("") {}

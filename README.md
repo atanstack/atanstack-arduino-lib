@@ -1,4 +1,4 @@
-# AtanstackMQTT
+# Atanstack
 
 Arduino library for publishing MQTT events from ESP32/ESP8266 to Atanstack data ingest.
 
@@ -26,7 +26,7 @@ Then add this library as ZIP or through Library Manager once published.
 ```cpp
 #include <WiFi.h>
 #include <ArduinoJson.h>
-#include <AtanstackMQTT.h>
+#include <Atanstack.h>
 
 WiFiClient wifiClient;
 AtanstackClient atanstack(wifiClient);
