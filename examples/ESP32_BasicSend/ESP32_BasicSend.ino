@@ -13,6 +13,8 @@ const char* WIFI_PASSWORD = "izhanhebat123";
 WiFiClient wifiClient;
 AtanstackClient atanstack(wifiClient);
 
+int countData = 1;
+
 void connectWifi() {
   Serial.print("wifi: connecting to ");
   Serial.println(WIFI_SSID);
@@ -34,18 +36,6 @@ void setup() {
 
   AtanstackConfig config;
   config.devicePid = "ATN-973Q-KCLL-KBMF";
-  config.brokerHost = "192.168.1.45";
-  config.brokerPort = 1883;
-  Serial.print("mqtt: probing ");
-  Serial.print(config.brokerHost);
-  Serial.print(":");
-  Serial.println(config.brokerPort);
-  if (wifiClient.connect(config.brokerHost, config.brokerPort)) {
-    Serial.println("mqtt: tcp probe ok");
-    wifiClient.stop();
-  } else {
-    Serial.println("mqtt: tcp probe failed");
-  }
 
   if (!atanstack.begin(config)) {
     Serial.print("atanstack: begin failed: ");
@@ -70,12 +60,12 @@ void loop() {
     delay(1000);
     return;
   }
-  int JsonObject count = atanstack.data("count", 1)
+  const JsonObject count = atanstack.data("count", countData);
   const JsonObject temperature = atanstack.data("temperature_c", 29.1);
   const JsonObject temperature_meta = atanstack.meta("firmware", "0.1.0");
   const JsonObject distance = atanstack.data("distance", 30.0);
 
-  const sendCount = atanstack.send("count", count);
+  const bool sendCount = atanstack.send("count", count);
   Serial.print("send count: ");
   Serial.println(sendCount ? "ok" : atanstack.lastError());
 
@@ -86,5 +76,7 @@ void loop() {
   const bool distanceSent = atanstack.send("distance-sensor", distance);
   Serial.print("send distance-sensor: ");
   Serial.println(distanceSent ? "ok" : atanstack.lastError());
+
+  countData++;
   delay(5000);
 }

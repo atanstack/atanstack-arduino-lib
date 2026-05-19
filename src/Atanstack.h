@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
+#include <time.h>
 
 struct AtanstackConfig {
   const char* brokerHost;
@@ -13,15 +14,19 @@ struct AtanstackConfig {
   const char* topicBase;
   size_t maxPayloadBytes;
   unsigned long reconnectIntervalMs;
+  bool autoHealthCheckEnabled;
+  unsigned long healthCheckIntervalMs;
 
   AtanstackConfig()
-      : brokerHost("broker.atanstack.com"),
+      : brokerHost("mqtt.hrzhkm.xyz"),
         brokerPort(1883),
         devicePid(""),
         clientId(""),
         topicBase("atanstack/v1/devices"),
         maxPayloadBytes(512),
-        reconnectIntervalMs(5000) {}
+        reconnectIntervalMs(5000),
+        autoHealthCheckEnabled(true),
+        healthCheckIntervalMs(30000) {}
 };
 
 class AtanstackClient {
@@ -50,6 +55,7 @@ class AtanstackClient {
   JsonObject meta(const char* key, bool value);
 
   bool send(const char* eventType, JsonObject data, JsonObject meta = JsonObject());
+  bool sendHealthCheck();
   const char* lastError() const;
 
  private:
@@ -58,6 +64,9 @@ class AtanstackClient {
   PubSubClient _mqtt;
   AtanstackConfig _config;
   unsigned long _lastReconnectAttemptMs;
+  unsigned long _lastHealthCheckMs;
+  bool _ntpInitAttempted;
+  unsigned long _lastNtpAttemptMs;
   String _lastError;
   DynamicJsonDocument* _dataSlots[kSlotCount];
   DynamicJsonDocument* _metaSlots[kSlotCount];
@@ -70,6 +79,8 @@ class AtanstackClient {
   JsonObject nextDataObject();
   JsonObject nextMetaObject();
   bool buildTopic(const char* eventType, String& outTopic) const;
+  void buildTimestamp(String& outTimestamp);
+  void ensureClockSynced();
   void setError(const char* message);
 };
 

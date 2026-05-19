@@ -3,6 +3,9 @@
 AtanstackClient::AtanstackClient(Client& networkClient)
     : _mqtt(networkClient),
       _lastReconnectAttemptMs(0),
+      _lastHealthCheckMs(0),
+      _ntpInitAttempted(false),
+      _lastNtpAttemptMs(0),
       _lastError(""),
       _nextDataSlot(0),
       _nextMetaSlot(0) {
@@ -34,6 +37,9 @@ bool AtanstackClient::begin(const AtanstackConfig& config) {
   }
   _nextDataSlot = 0;
   _nextMetaSlot = 0;
+  _lastHealthCheckMs = 0;
+  _ntpInitAttempted = false;
+  _lastNtpAttemptMs = 0;
   _lastError = "";
   return true;
 }
@@ -57,17 +63,26 @@ bool AtanstackClient::connect() {
     return false;
   }
 
+  _lastHealthCheckMs = 0;
   _lastError = "";
   return true;
 }
 
 void AtanstackClient::loop() {
   _mqtt.loop();
+  unsigned long now = millis();
+
   if (_mqtt.connected()) {
+    ensureClockSynced();
+    if (_config.autoHealthCheckEnabled &&
+        (now - _lastHealthCheckMs) >= _config.healthCheckIntervalMs) {
+      if (sendHealthCheck()) {
+        _lastHealthCheckMs = now;
+      }
+    }
     return;
   }
 
-  unsigned long now = millis();
   if ((now - _lastReconnectAttemptMs) < _config.reconnectIntervalMs) {
     return;
   }
@@ -222,7 +237,9 @@ bool AtanstackClient::send(const char* eventType, JsonObject data, JsonObject me
   DynamicJsonDocument doc(_config.maxPayloadBytes);
   doc["device_id"] = _config.devicePid;
   doc["event_type"] = eventType;
-  doc["timestamp"] = "1970-01-01T00:00:00Z";
+  String timestamp;
+  buildTimestamp(timestamp);
+  doc["timestamp"] = timestamp;
   doc["schema_version"] = 1;
 
   JsonObject payloadData = doc.createNestedObject("data");
@@ -256,6 +273,14 @@ bool AtanstackClient::send(const char* eventType, JsonObject data, JsonObject me
 
   _lastError = "";
   return true;
+}
+
+bool AtanstackClient::sendHealthCheck() {
+  JsonObject health = data("health", "ok");
+  if (health.isNull()) {
+    return false;
+  }
+  return send("health-check", health);
 }
 
 const char* AtanstackClient::lastError() const {
@@ -337,6 +362,38 @@ bool AtanstackClient::buildTopic(const char* eventType, String& outTopic) const 
   outTopic += "/events/";
   outTopic += eventType;
   return true;
+}
+
+void AtanstackClient::buildTimestamp(String& outTimestamp) {
+  ensureClockSynced();
+  const time_t now = time(nullptr);
+  if (now < 946684800) {
+    outTimestamp = "1970-01-01T00:00:00Z";
+    return;
+  }
+
+  struct tm timeInfo;
+  gmtime_r(&now, &timeInfo);
+  char buffer[25];
+  strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &timeInfo);
+  outTimestamp = buffer;
+}
+
+void AtanstackClient::ensureClockSynced() {
+#if defined(ESP32) || defined(ESP8266)
+  const unsigned long nowMs = millis();
+  if (_ntpInitAttempted && (nowMs - _lastNtpAttemptMs) < 10000) {
+    return;
+  }
+
+  if (time(nullptr) >= 946684800) {
+    return;
+  }
+
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  _ntpInitAttempted = true;
+  _lastNtpAttemptMs = nowMs;
+#endif
 }
 
 void AtanstackClient::setError(const char* message) {
