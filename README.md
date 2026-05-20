@@ -35,7 +35,7 @@ AtanstackClient atanstack(wifiClient);
 void setup() {
   AtanstackConfig config;
   config.devicePid = "dev_12345";
-  // broker defaults to mqtt.hrzhkm.xyz:1883
+  // broker defaults to 192.168.1.45:1883
 
   atanstack.begin(config);
   atanstack.connect();

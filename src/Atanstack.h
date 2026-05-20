@@ -18,7 +18,7 @@ struct AtanstackConfig {
   unsigned long healthCheckIntervalMs;
 
   AtanstackConfig()
-      : brokerHost("mqtt.hrzhkm.xyz"),
+      : brokerHost("192.168.1.45"),
         brokerPort(1883),
         devicePid(""),
         clientId(""),
