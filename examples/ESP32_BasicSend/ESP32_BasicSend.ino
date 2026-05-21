@@ -36,7 +36,7 @@ void setup() {
 
   AtanstackConfig config;
   config.devicePid = "ATN-973Q-KCLL-KBMF";
-  config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
+  config.deviceSecret = "AKalZFF3gdas35qPUMav0buCjdaNRy8vRVvsFuPh";
 
   if (!atanstack.begin(config)) {
     Serial.print("atanstack: begin failed: ");

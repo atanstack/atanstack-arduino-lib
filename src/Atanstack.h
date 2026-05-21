@@ -20,7 +20,7 @@ struct AtanstackConfig {
   unsigned long healthCheckIntervalMs;
 
   AtanstackConfig()
-      : brokerHost("34.143.146.35"),
+      : brokerHost("192.168.1.45"),
         brokerPort(1883),
         devicePid(""),
         deviceSecret(""),
