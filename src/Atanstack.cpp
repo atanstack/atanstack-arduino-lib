@@ -49,6 +49,10 @@ bool AtanstackClient::connect() {
     setError("missing_device_pid");
     return false;
   }
+  if (_config.deviceSecret == nullptr || strlen(_config.deviceSecret) == 0) {
+    setError("missing_device_secret");
+    return false;
+  }
 
   if (_mqtt.connected()) {
     return true;
@@ -57,8 +61,12 @@ bool AtanstackClient::connect() {
   const char* clientId = (_config.clientId != nullptr && strlen(_config.clientId) > 0)
                              ? _config.clientId
                              : _config.devicePid;
+  const char* mqttUsername =
+      (_config.mqttUsername != nullptr && strlen(_config.mqttUsername) > 0)
+          ? _config.mqttUsername
+          : _config.devicePid;
 
-  if (!_mqtt.connect(clientId, _config.devicePid, nullptr)) {
+  if (!_mqtt.connect(clientId, mqttUsername, _config.deviceSecret)) {
     setError("mqtt_connect_failed");
     return false;
   }
@@ -294,6 +302,10 @@ bool AtanstackClient::validateConfig(const AtanstackConfig& config) {
   }
   if (config.devicePid == nullptr || strlen(config.devicePid) == 0) {
     setError("missing_device_pid");
+    return false;
+  }
+  if (config.deviceSecret == nullptr || strlen(config.deviceSecret) == 0) {
+    setError("missing_device_secret");
     return false;
   }
   if (config.topicBase == nullptr || strlen(config.topicBase) == 0) {

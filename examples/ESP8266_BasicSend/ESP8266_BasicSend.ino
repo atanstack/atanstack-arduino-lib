@@ -25,7 +25,8 @@ void setup() {
   connectWifi();
 
   AtanstackConfig config;
-  config.devicePid = "dev_esp8266_01";
+  config.devicePid = "ATN-XXXX-XXXX-XXXX";
+  config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
 
   atanstack.begin(config);
   atanstack.connect();

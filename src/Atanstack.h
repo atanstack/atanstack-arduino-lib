@@ -10,6 +10,8 @@ struct AtanstackConfig {
   const char* brokerHost;
   uint16_t brokerPort;
   const char* devicePid;
+  const char* deviceSecret;
+  const char* mqttUsername;
   const char* clientId;
   const char* topicBase;
   size_t maxPayloadBytes;
@@ -18,9 +20,11 @@ struct AtanstackConfig {
   unsigned long healthCheckIntervalMs;
 
   AtanstackConfig()
-      : brokerHost("192.168.1.45"),
+      : brokerHost("34.143.146.35"),
         brokerPort(1883),
         devicePid(""),
+        deviceSecret(""),
+        mqttUsername(""),
         clientId(""),
         topicBase("atanstack/v1/devices"),
         maxPayloadBytes(512),

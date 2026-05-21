@@ -10,7 +10,7 @@ Arduino library for publishing device events from ESP32/ESP8266 to AtanStack dat
 - Lightweight JSON builders:
   - `atanstack.data(key, value)`
   - `atanstack.meta(key, value)`
-- Uses `device_pid` as MQTT username.
+- Uses per-device MQTT credentials (`devicePid` + `deviceSecret`).
 - Default topic format:
   - `atanstack/v1/devices/{devicePid}/events/{eventType}`
 
@@ -34,8 +34,10 @@ AtanstackClient atanstack(wifiClient);
 
 void setup() {
   AtanstackConfig config;
-  config.devicePid = "dev_12345";
-  // broker defaults to 192.168.1.45:1883
+  config.devicePid = "ATN-XXXX-XXXX-XXXX";
+  config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
+  // optional override if broker username differs from devicePid
+  // config.mqttUsername = "ATN-XXXX-XXXX-XXXX";
 
   atanstack.begin(config);
   atanstack.connect();
