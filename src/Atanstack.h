@@ -30,7 +30,7 @@ struct AtanstackConfig {
         maxPayloadBytes(512),
         reconnectIntervalMs(5000),
         autoHealthCheckEnabled(true),
-        healthCheckIntervalMs(30000) {}
+        healthCheckIntervalMs(10000) {}
 };
 
 class AtanstackClient {
