@@ -469,6 +469,9 @@ bool AtanstackClient::publishSwitchCapability(uint8_t gpio, uint8_t activeLevel)
   if (capability.isNull()) {
     return false;
   }
+  String controlId = "switch-gpio-";
+  controlId += String(gpio);
+  capability["control_id"] = controlId;
   capability["active_low"] = activeLevel == LOW;
   capability["control"] = "switch";
   return send("capability-switch", capability);

@@ -1,7 +1,7 @@
 // Use case:
-// ESP32 switch control over MQTT.
-// Register a GPIO switch capability with active-low wiring and accept
-// remote on/off commands from AtanStack control topic.
+// ESP32 multi-switch control over MQTT.
+// Register multiple GPIO switch capabilities and accept remote on/off
+// commands from AtanStack control topic.
 
 #include <WiFi.h>
 #include <Atanstack.h>
@@ -12,11 +12,9 @@ const char* WIFI_PASSWORD = "izhanhebat123";
 WiFiClient wifiClient;
 AtanstackClient atanstack(wifiClient);
 
-const uint8_t SWITCH_GPIO = 2;
-unsigned long lastDiagPrintMs = 0;
-uint32_t lastSeenPingCount = 0;
-uint32_t lastSeenPongPublishedCount = 0;
-uint32_t lastSeenPongFailCount = 0;
+const uint8_t SWITCH_GPIO_1 = 2;
+const uint8_t SWITCH_GPIO_2 = 4;
+const uint8_t SWITCH_GPIO_3 = 5;
 
 void connectWifi() {
   Serial.print("wifi: connecting to ");
@@ -48,9 +46,20 @@ void setup() {
     return;
   }
 
-  // Closest C++ form to `atanstack.switch(gpio, low)` is `switchPin(gpio, LOW)`.
-  if (!atanstack.switchPin(SWITCH_GPIO, LOW)) {
-    Serial.print("atanstack: switchPin failed: ");
+  if (!atanstack.switchPin(SWITCH_GPIO_1, LOW)) {
+    Serial.print("atanstack: switchPin gpio 2 failed: ");
+    Serial.println(atanstack.lastError());
+    return;
+  }
+
+  if (!atanstack.switchPin(SWITCH_GPIO_2, LOW)) {
+    Serial.print("atanstack: switchPin gpio 4 failed: ");
+    Serial.println(atanstack.lastError());
+    return;
+  }
+
+  if (!atanstack.switchPin(SWITCH_GPIO_3, LOW)) {
+    Serial.print("atanstack: switchPin gpio 5 failed: ");
     Serial.println(atanstack.lastError());
     return;
   }
@@ -61,7 +70,7 @@ void setup() {
     return;
   }
 
-  Serial.println("atanstack: ready for switch commands");
+  Serial.println("atanstack: ready for multi-switch commands");
 }
 
 void loop() {
@@ -74,41 +83,5 @@ void loop() {
     return;
   }
 
-  const unsigned long now = millis();
-  const uint32_t pingCount = atanstack.pingReceivedCount();
-  const uint32_t pongPublishedCount = atanstack.pongPublishedCount();
-  const uint32_t pongFailCount = atanstack.pongPublishFailCount();
-
-  if (pingCount != lastSeenPingCount ||
-      pongPublishedCount != lastSeenPongPublishedCount ||
-      pongFailCount != lastSeenPongFailCount) {
-    Serial.print("atanstack: liveness diag ping_received=");
-    Serial.print(pingCount);
-    Serial.print(" pong_published=");
-    Serial.print(pongPublishedCount);
-    Serial.print(" pong_failed=");
-    Serial.print(pongFailCount);
-    Serial.print(" last_ping_request_id=");
-    Serial.print(atanstack.lastPingRequestId());
-    Serial.print(" last_ping_ms=");
-    Serial.println(atanstack.lastPingReceivedMs());
-    if (strlen(atanstack.lastError()) > 0) {
-      Serial.print("atanstack: lastError=");
-      Serial.println(atanstack.lastError());
-    }
-
-    lastSeenPingCount = pingCount;
-    lastSeenPongPublishedCount = pongPublishedCount;
-    lastSeenPongFailCount = pongFailCount;
-  }
-
-  if ((now - lastDiagPrintMs) >= 10000) {
-    lastDiagPrintMs = now;
-    Serial.print("atanstack: heartbeat connected=1 ping_received=");
-    Serial.print(pingCount);
-    Serial.print(" pong_published=");
-    Serial.print(pongPublishedCount);
-    Serial.print(" pong_failed=");
-    Serial.println(pongFailCount);
-  }
+  delay(10);
 }
