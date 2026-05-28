@@ -35,6 +35,9 @@ struct AtanstackConfig {
 
 class AtanstackClient {
  public:
+  static const uint8_t low = LOW;
+  static const uint8_t high = HIGH;
+
   explicit AtanstackClient(Client& networkClient);
 
   bool begin(const AtanstackConfig& config);
@@ -60,12 +63,24 @@ class AtanstackClient {
 
   bool send(const char* eventType, JsonObject data, JsonObject meta = JsonObject());
   bool sendHealthCheck();
+  bool switchPin(uint8_t gpio, uint8_t activeLevel = low);
   const char* lastError() const;
+  uint32_t pingReceivedCount() const;
+  uint32_t pongPublishedCount() const;
+  uint32_t pongPublishFailCount() const;
+  const char* lastPingRequestId() const;
+  unsigned long lastPingReceivedMs() const;
 
  private:
   static const uint8_t kSlotCount = 8;
+  struct SwitchSlot {
+    uint8_t gpio;
+    uint8_t activeLevel;
+    bool used;
+  };
 
   PubSubClient _mqtt;
+  static AtanstackClient* _activeInstance;
   AtanstackConfig _config;
   unsigned long _lastReconnectAttemptMs;
   unsigned long _lastHealthCheckMs;
@@ -74,9 +89,26 @@ class AtanstackClient {
   String _lastError;
   DynamicJsonDocument* _dataSlots[kSlotCount];
   DynamicJsonDocument* _metaSlots[kSlotCount];
+  SwitchSlot _switchSlots[kSlotCount];
   uint8_t _nextDataSlot;
   uint8_t _nextMetaSlot;
+  uint32_t _pingReceivedCount;
+  uint32_t _pongPublishedCount;
+  uint32_t _pongPublishFailCount;
+  String _lastPingRequestId;
+  unsigned long _lastPingReceivedMs;
 
+  static void onMqttMessage(char* topic, byte* payload, unsigned int length);
+  bool subscribeControlTopic();
+  bool buildControlTopic(String& outTopic) const;
+  bool buildPingTopic(String& outTopic) const;
+  bool buildPongTopic(String& outTopic) const;
+  bool publishPong(const char* requestId);
+  bool publishSwitchCapability(uint8_t gpio, uint8_t activeLevel);
+  bool findSwitchSlotByGpio(uint8_t gpio, uint8_t& outIndex) const;
+  bool isSwitchStateOn(const JsonDocument& doc, bool& outOn) const;
+  bool applySwitchState(uint8_t gpio, bool on);
+  void handleMqttMessage(char* topic, byte* payload, unsigned int length);
   bool validateConfig(const AtanstackConfig& config);
   bool validateSendArgs(const char* eventType, JsonObject data);
   bool validateKey(const char* key);

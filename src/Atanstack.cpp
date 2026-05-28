@@ -1,5 +1,7 @@
 #include "Atanstack.h"
 
+AtanstackClient* AtanstackClient::_activeInstance = nullptr;
+
 AtanstackClient::AtanstackClient(Client& networkClient)
     : _mqtt(networkClient),
       _lastReconnectAttemptMs(0),
@@ -7,11 +9,19 @@ AtanstackClient::AtanstackClient(Client& networkClient)
       _ntpInitAttempted(false),
       _lastNtpAttemptMs(0),
       _lastError(""),
+      _pingReceivedCount(0),
+      _pongPublishedCount(0),
+      _pongPublishFailCount(0),
+      _lastPingRequestId(""),
+      _lastPingReceivedMs(0),
       _nextDataSlot(0),
       _nextMetaSlot(0) {
   for (uint8_t i = 0; i < kSlotCount; ++i) {
     _dataSlots[i] = nullptr;
     _metaSlots[i] = nullptr;
+    _switchSlots[i].gpio = 0;
+    _switchSlots[i].activeLevel = LOW;
+    _switchSlots[i].used = false;
   }
 }
 
@@ -22,6 +32,8 @@ bool AtanstackClient::begin(const AtanstackConfig& config) {
 
   _config = config;
   _mqtt.setServer(_config.brokerHost, _config.brokerPort);
+  _activeInstance = this;
+  _mqtt.setCallback(AtanstackClient::onMqttMessage);
   _mqtt.setBufferSize((uint16_t)_config.maxPayloadBytes);
   for (uint8_t i = 0; i < kSlotCount; ++i) {
     if (_dataSlots[i] != nullptr) {
@@ -41,6 +53,11 @@ bool AtanstackClient::begin(const AtanstackConfig& config) {
   _ntpInitAttempted = false;
   _lastNtpAttemptMs = 0;
   _lastError = "";
+  _pingReceivedCount = 0;
+  _pongPublishedCount = 0;
+  _pongPublishFailCount = 0;
+  _lastPingRequestId = "";
+  _lastPingReceivedMs = 0;
   return true;
 }
 
@@ -72,6 +89,14 @@ bool AtanstackClient::connect() {
   }
 
   _lastHealthCheckMs = 0;
+  if (!subscribeControlTopic()) {
+    return false;
+  }
+  for (uint8_t i = 0; i < kSlotCount; ++i) {
+    if (_switchSlots[i].used) {
+      publishSwitchCapability(_switchSlots[i].gpio, _switchSlots[i].activeLevel);
+    }
+  }
   _lastError = "";
   return true;
 }
@@ -82,12 +107,6 @@ void AtanstackClient::loop() {
 
   if (_mqtt.connected()) {
     ensureClockSynced();
-    if (_config.autoHealthCheckEnabled &&
-        (now - _lastHealthCheckMs) >= _config.healthCheckIntervalMs) {
-      if (sendHealthCheck()) {
-        _lastHealthCheckMs = now;
-      }
-    }
     return;
   }
 
@@ -291,8 +310,263 @@ bool AtanstackClient::sendHealthCheck() {
   return send("health-check", health);
 }
 
+bool AtanstackClient::switchPin(uint8_t gpio, uint8_t activeLevel) {
+  if (activeLevel != LOW && activeLevel != HIGH) {
+    setError("invalid_active_level");
+    return false;
+  }
+
+  uint8_t slotIndex = 0;
+  if (!findSwitchSlotByGpio(gpio, slotIndex)) {
+    for (uint8_t i = 0; i < kSlotCount; ++i) {
+      if (!_switchSlots[i].used) {
+        slotIndex = i;
+        _switchSlots[i].used = true;
+        _switchSlots[i].gpio = gpio;
+        break;
+      }
+    }
+    if (!_switchSlots[slotIndex].used || _switchSlots[slotIndex].gpio != gpio) {
+      setError("switch_slot_full");
+      return false;
+    }
+  }
+
+  _switchSlots[slotIndex].activeLevel = activeLevel;
+  pinMode(gpio, OUTPUT);
+  digitalWrite(gpio, activeLevel == LOW ? HIGH : LOW);
+
+  if (_mqtt.connected()) {
+    if (!publishSwitchCapability(gpio, activeLevel)) {
+      return false;
+    }
+  }
+
+  _lastError = "";
+  return true;
+}
+
 const char* AtanstackClient::lastError() const {
   return _lastError.length() == 0 ? "" : _lastError.c_str();
+}
+
+uint32_t AtanstackClient::pingReceivedCount() const { return _pingReceivedCount; }
+
+uint32_t AtanstackClient::pongPublishedCount() const { return _pongPublishedCount; }
+
+uint32_t AtanstackClient::pongPublishFailCount() const { return _pongPublishFailCount; }
+
+const char* AtanstackClient::lastPingRequestId() const {
+  return _lastPingRequestId.length() == 0 ? "" : _lastPingRequestId.c_str();
+}
+
+unsigned long AtanstackClient::lastPingReceivedMs() const {
+  return _lastPingReceivedMs;
+}
+
+void AtanstackClient::onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  if (_activeInstance == nullptr) {
+    return;
+  }
+  _activeInstance->handleMqttMessage(topic, payload, length);
+}
+
+bool AtanstackClient::subscribeControlTopic() {
+  String topic;
+  if (!buildControlTopic(topic)) {
+    setError("build_control_topic_failed");
+    return false;
+  }
+  if (!_mqtt.subscribe(topic.c_str())) {
+    setError("subscribe_control_failed");
+    return false;
+  }
+
+  String pingTopic;
+  if (!buildPingTopic(pingTopic)) {
+    setError("build_ping_topic_failed");
+    return false;
+  }
+  if (!_mqtt.subscribe(pingTopic.c_str())) {
+    setError("subscribe_ping_failed");
+    return false;
+  }
+
+  return true;
+}
+
+bool AtanstackClient::buildControlTopic(String& outTopic) const {
+  if (_config.topicBase == nullptr || strlen(_config.topicBase) == 0) {
+    return false;
+  }
+  outTopic.reserve(strlen(_config.topicBase) + strlen(_config.devicePid) + 20);
+  outTopic = _config.topicBase;
+  outTopic += "/";
+  outTopic += _config.devicePid;
+  outTopic += "/control/switch";
+  return true;
+}
+
+bool AtanstackClient::buildPingTopic(String& outTopic) const {
+  if (_config.topicBase == nullptr || strlen(_config.topicBase) == 0) {
+    return false;
+  }
+  outTopic.reserve(strlen(_config.topicBase) + strlen(_config.devicePid) + 20);
+  outTopic = _config.topicBase;
+  outTopic += "/";
+  outTopic += _config.devicePid;
+  outTopic += "/commands/ping";
+  return true;
+}
+
+bool AtanstackClient::buildPongTopic(String& outTopic) const {
+  if (_config.topicBase == nullptr || strlen(_config.topicBase) == 0) {
+    return false;
+  }
+  outTopic.reserve(strlen(_config.topicBase) + strlen(_config.devicePid) + 18);
+  outTopic = _config.topicBase;
+  outTopic += "/";
+  outTopic += _config.devicePid;
+  outTopic += "/status/pong";
+  return true;
+}
+
+bool AtanstackClient::publishPong(const char* requestId) {
+  if (requestId == nullptr || strlen(requestId) == 0) {
+    setError("pong_missing_request_id");
+    return false;
+  }
+
+  String topic;
+  if (!buildPongTopic(topic)) {
+    setError("pong_topic_failed");
+    return false;
+  }
+
+  DynamicJsonDocument doc(_config.maxPayloadBytes / 2);
+  doc["request_id"] = requestId;
+  String sentAt;
+  buildTimestamp(sentAt);
+  doc["sent_at"] = sentAt;
+
+  String payload;
+  if (serializeJson(doc, payload) == 0) {
+    setError("pong_serialize_failed");
+    return false;
+  }
+
+  if (!_mqtt.publish(topic.c_str(), payload.c_str())) {
+    setError("pong_publish_failed");
+    return false;
+  }
+
+  _lastError = "";
+  return true;
+}
+
+bool AtanstackClient::publishSwitchCapability(uint8_t gpio, uint8_t activeLevel) {
+  JsonObject capability = data("gpio", (int)gpio);
+  if (capability.isNull()) {
+    return false;
+  }
+  capability["active_low"] = activeLevel == LOW;
+  capability["control"] = "switch";
+  return send("capability-switch", capability);
+}
+
+bool AtanstackClient::findSwitchSlotByGpio(uint8_t gpio, uint8_t& outIndex) const {
+  for (uint8_t i = 0; i < kSlotCount; ++i) {
+    if (_switchSlots[i].used && _switchSlots[i].gpio == gpio) {
+      outIndex = i;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool AtanstackClient::isSwitchStateOn(const JsonDocument& doc, bool& outOn) const {
+  if (doc["on"].is<bool>()) {
+    outOn = doc["on"].as<bool>();
+    return true;
+  }
+  if (doc["state"].is<const char*>()) {
+    const char* state = doc["state"];
+    if (state != nullptr && strcmp(state, "on") == 0) {
+      outOn = true;
+      return true;
+    }
+    if (state != nullptr && strcmp(state, "off") == 0) {
+      outOn = false;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool AtanstackClient::applySwitchState(uint8_t gpio, bool on) {
+  uint8_t slotIndex = 0;
+  if (!findSwitchSlotByGpio(gpio, slotIndex)) {
+    setError("switch_not_registered");
+    return false;
+  }
+  const uint8_t onLevel = _switchSlots[slotIndex].activeLevel;
+  const uint8_t offLevel = onLevel == LOW ? HIGH : LOW;
+  digitalWrite(gpio, on ? onLevel : offLevel);
+  _lastError = "";
+  return true;
+}
+
+void AtanstackClient::handleMqttMessage(char* topic, byte* payload, unsigned int length) {
+  if (topic == nullptr || payload == nullptr || length == 0) {
+    return;
+  }
+
+  String controlTopic;
+  if (!buildControlTopic(controlTopic)) {
+    return;
+  }
+  String pingTopic;
+  if (!buildPingTopic(pingTopic)) {
+    return;
+  }
+
+  DynamicJsonDocument doc(_config.maxPayloadBytes);
+  DeserializationError error = deserializeJson(doc, payload, length);
+  if (error) {
+    setError("command_payload_invalid");
+    return;
+  }
+
+  if (strcmp(topic, controlTopic.c_str()) == 0) {
+    if (!doc["gpio"].is<int>()) {
+      setError("control_missing_gpio");
+      return;
+    }
+
+    bool on = false;
+    if (!isSwitchStateOn(doc, on)) {
+      setError("control_missing_state");
+      return;
+    }
+
+    applySwitchState((uint8_t)doc["gpio"].as<int>(), on);
+    return;
+  }
+
+  if (strcmp(topic, pingTopic.c_str()) == 0) {
+    const char* requestId =
+        doc["request_id"].is<const char*>() ? doc["request_id"].as<const char*>()
+                                             : nullptr;
+    _pingReceivedCount += 1;
+    _lastPingReceivedMs = millis();
+    _lastPingRequestId = requestId == nullptr ? "" : requestId;
+    if (publishPong(requestId)) {
+      _pongPublishedCount += 1;
+    } else {
+      _pongPublishFailCount += 1;
+    }
+    return;
+  }
 }
 
 bool AtanstackClient::validateConfig(const AtanstackConfig& config) {
