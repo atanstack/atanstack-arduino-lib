@@ -2,6 +2,38 @@
 
 AtanstackClient* AtanstackClient::_activeInstance = nullptr;
 
+namespace {
+uint32_t fnv1aHash(const String& value) {
+  uint32_t hash = 2166136261u;
+  for (size_t i = 0; i < value.length(); ++i) {
+    hash ^= (uint8_t)value[i];
+    hash *= 16777619u;
+  }
+  return hash;
+}
+
+void appendBase36Chunk(String& out, uint32_t value) {
+  static const char* kAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for (int i = 0; i < 4; ++i) {
+    out += kAlphabet[value % 36u];
+    value /= 36u;
+  }
+}
+
+void appendPaddedBase36Chunk(String& out, uint32_t value) {
+  static const char* kAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  char chunk[4];
+  for (int i = 3; i >= 0; --i) {
+    chunk[i] = kAlphabet[value % 36u];
+    value /= 36u;
+  }
+  out += chunk[0];
+  out += chunk[1];
+  out += chunk[2];
+  out += chunk[3];
+}
+}  // namespace
+
 AtanstackClient::AtanstackClient(Client& networkClient)
     : _mqtt(networkClient),
       _lastReconnectAttemptMs(0),
@@ -94,7 +126,7 @@ bool AtanstackClient::connect() {
   }
   for (uint8_t i = 0; i < kSlotCount; ++i) {
     if (_switchSlots[i].used) {
-      publishSwitchCapability(_switchSlots[i].gpio, _switchSlots[i].activeLevel);
+      publishSwitchCapability(i, _switchSlots[i].gpio, _switchSlots[i].activeLevel);
     }
   }
   _lastError = "";
@@ -337,7 +369,7 @@ bool AtanstackClient::switchPin(uint8_t gpio, uint8_t activeLevel) {
   digitalWrite(gpio, activeLevel == LOW ? HIGH : LOW);
 
   if (_mqtt.connected()) {
-    if (!publishSwitchCapability(gpio, activeLevel)) {
+    if (!publishSwitchCapability(slotIndex, gpio, activeLevel)) {
       return false;
     }
   }
@@ -464,13 +496,25 @@ bool AtanstackClient::publishPong(const char* requestId) {
   return true;
 }
 
-bool AtanstackClient::publishSwitchCapability(uint8_t gpio, uint8_t activeLevel) {
+bool AtanstackClient::publishSwitchCapability(uint8_t slotIndex,
+                                              uint8_t gpio,
+                                              uint8_t activeLevel) {
   JsonObject capability = data("gpio", (int)gpio);
   if (capability.isNull()) {
     return false;
   }
-  String controlId = "switch-gpio-";
-  controlId += String(gpio);
+  const String deviceId = String(_config.devicePid != nullptr ? _config.devicePid : "");
+  const String slotTag = String((unsigned int)slotIndex + 1);
+  const uint32_t hashA = fnv1aHash(deviceId);
+  const uint32_t hashB = fnv1aHash(deviceId + "-" + slotTag);
+  const uint32_t slotCode = (uint32_t)slotIndex + 1u;
+
+  String controlId = "switch-";
+  appendBase36Chunk(controlId, hashA);
+  controlId += "-";
+  appendBase36Chunk(controlId, hashB);
+  controlId += "-";
+  appendPaddedBase36Chunk(controlId, slotCode);
   capability["control_id"] = controlId;
   capability["active_low"] = activeLevel == LOW;
   capability["control"] = "switch";

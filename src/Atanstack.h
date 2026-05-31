@@ -104,7 +104,7 @@ class AtanstackClient {
   bool buildPingTopic(String& outTopic) const;
   bool buildPongTopic(String& outTopic) const;
   bool publishPong(const char* requestId);
-  bool publishSwitchCapability(uint8_t gpio, uint8_t activeLevel);
+  bool publishSwitchCapability(uint8_t slotIndex, uint8_t gpio, uint8_t activeLevel);
   bool findSwitchSlotByGpio(uint8_t gpio, uint8_t& outIndex) const;
   bool isSwitchStateOn(const JsonDocument& doc, bool& outOn) const;
   bool applySwitchState(uint8_t gpio, bool on);
