@@ -27,6 +27,13 @@ void connectWifi() {
   Serial.println();
   Serial.print("wifi: connected, ip=");
   Serial.println(WiFi.localIP());
+  IPAddress brokerIp;
+  if (WiFi.hostByName("mqtt.hrzhkm.xyz", brokerIp)) {
+    Serial.print("dns: mqtt.hrzhkm.xyz -> ");
+    Serial.println(brokerIp);
+  } else {
+    Serial.println("dns: failed resolving mqtt.hrzhkm.xyz");
+  }
 }
 
 void setup() {
@@ -67,6 +74,8 @@ void setup() {
   if (!atanstack.connect()) {
     Serial.print("atanstack: connect failed: ");
     Serial.println(atanstack.lastError());
+    Serial.print("atanstack: mqtt state=");
+    Serial.println(atanstack.mqttState());
     return;
   }
 
@@ -79,6 +88,8 @@ void loop() {
   if (!atanstack.connected()) {
     Serial.print("atanstack: waiting reconnect, lastError=");
     Serial.println(atanstack.lastError());
+    Serial.print("atanstack: mqtt state=");
+    Serial.println(atanstack.mqttState());
     delay(1000);
     return;
   }

@@ -382,6 +382,8 @@ const char* AtanstackClient::lastError() const {
   return _lastError.length() == 0 ? "" : _lastError.c_str();
 }
 
+int AtanstackClient::mqttState() { return _mqtt.state(); }
+
 uint32_t AtanstackClient::pingReceivedCount() const { return _pingReceivedCount; }
 
 uint32_t AtanstackClient::pongPublishedCount() const { return _pongPublishedCount; }

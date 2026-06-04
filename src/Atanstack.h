@@ -20,7 +20,8 @@ struct AtanstackConfig {
   unsigned long healthCheckIntervalMs;
 
   AtanstackConfig()
-      : brokerHost("192.168.1.45"),
+      // : brokerHost("mqtt.hrzhkm.xyz"),
+      : brokerHost("mqtt.hrzhkm.xyz"),
         brokerPort(1883),
         devicePid(""),
         deviceSecret(""),
@@ -65,6 +66,7 @@ class AtanstackClient {
   bool sendHealthCheck();
   bool switchPin(uint8_t gpio, uint8_t activeLevel = low);
   const char* lastError() const;
+  int mqttState();
   uint32_t pingReceivedCount() const;
   uint32_t pongPublishedCount() const;
   uint32_t pongPublishFailCount() const;
