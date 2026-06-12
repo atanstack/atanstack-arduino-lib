@@ -16,11 +16,9 @@ struct AtanstackConfig {
   const char* topicBase;
   size_t maxPayloadBytes;
   unsigned long reconnectIntervalMs;
-  bool autoHealthCheckEnabled;
-  unsigned long healthCheckIntervalMs;
 
   AtanstackConfig()
-      // : brokerHost("mqtt.hrzhkm.xyz"),
+      // : brokerHost("192.168.1.52"),
       : brokerHost("mqtt.hrzhkm.xyz"),
         brokerPort(1883),
         devicePid(""),
@@ -29,9 +27,7 @@ struct AtanstackConfig {
         clientId(""),
         topicBase("atanstack/v1/devices"),
         maxPayloadBytes(512),
-        reconnectIntervalMs(5000),
-        autoHealthCheckEnabled(true),
-        healthCheckIntervalMs(10000) {}
+        reconnectIntervalMs(5000) {}
 };
 
 class AtanstackClient {
@@ -63,15 +59,9 @@ class AtanstackClient {
   JsonObject meta(const char* key, bool value);
 
   bool send(const char* eventType, JsonObject data, JsonObject meta = JsonObject());
-  bool sendHealthCheck();
   bool switchPin(uint8_t gpio, uint8_t activeLevel = low);
   const char* lastError() const;
   int mqttState();
-  uint32_t pingReceivedCount() const;
-  uint32_t pongPublishedCount() const;
-  uint32_t pongPublishFailCount() const;
-  const char* lastPingRequestId() const;
-  unsigned long lastPingReceivedMs() const;
 
  private:
   static const uint8_t kSlotCount = 8;
@@ -85,7 +75,6 @@ class AtanstackClient {
   static AtanstackClient* _activeInstance;
   AtanstackConfig _config;
   unsigned long _lastReconnectAttemptMs;
-  unsigned long _lastHealthCheckMs;
   bool _ntpInitAttempted;
   unsigned long _lastNtpAttemptMs;
   String _lastError;
@@ -94,11 +83,6 @@ class AtanstackClient {
   SwitchSlot _switchSlots[kSlotCount];
   uint8_t _nextDataSlot;
   uint8_t _nextMetaSlot;
-  uint32_t _pingReceivedCount;
-  uint32_t _pongPublishedCount;
-  uint32_t _pongPublishFailCount;
-  String _lastPingRequestId;
-  unsigned long _lastPingReceivedMs;
 
   static void onMqttMessage(char* topic, byte* payload, unsigned int length);
   bool subscribeControlTopic();

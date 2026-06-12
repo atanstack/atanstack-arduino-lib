@@ -37,15 +37,9 @@ void appendPaddedBase36Chunk(String& out, uint32_t value) {
 AtanstackClient::AtanstackClient(Client& networkClient)
     : _mqtt(networkClient),
       _lastReconnectAttemptMs(0),
-      _lastHealthCheckMs(0),
       _ntpInitAttempted(false),
       _lastNtpAttemptMs(0),
       _lastError(""),
-      _pingReceivedCount(0),
-      _pongPublishedCount(0),
-      _pongPublishFailCount(0),
-      _lastPingRequestId(""),
-      _lastPingReceivedMs(0),
       _nextDataSlot(0),
       _nextMetaSlot(0) {
   for (uint8_t i = 0; i < kSlotCount; ++i) {
@@ -81,15 +75,9 @@ bool AtanstackClient::begin(const AtanstackConfig& config) {
   }
   _nextDataSlot = 0;
   _nextMetaSlot = 0;
-  _lastHealthCheckMs = 0;
   _ntpInitAttempted = false;
   _lastNtpAttemptMs = 0;
   _lastError = "";
-  _pingReceivedCount = 0;
-  _pongPublishedCount = 0;
-  _pongPublishFailCount = 0;
-  _lastPingRequestId = "";
-  _lastPingReceivedMs = 0;
   return true;
 }
 
@@ -120,7 +108,6 @@ bool AtanstackClient::connect() {
     return false;
   }
 
-  _lastHealthCheckMs = 0;
   if (!subscribeControlTopic()) {
     return false;
   }
@@ -334,14 +321,6 @@ bool AtanstackClient::send(const char* eventType, JsonObject data, JsonObject me
   return true;
 }
 
-bool AtanstackClient::sendHealthCheck() {
-  JsonObject health = data("health", "ok");
-  if (health.isNull()) {
-    return false;
-  }
-  return send("health-check", health);
-}
-
 bool AtanstackClient::switchPin(uint8_t gpio, uint8_t activeLevel) {
   if (activeLevel != LOW && activeLevel != HIGH) {
     setError("invalid_active_level");
@@ -383,20 +362,6 @@ const char* AtanstackClient::lastError() const {
 }
 
 int AtanstackClient::mqttState() { return _mqtt.state(); }
-
-uint32_t AtanstackClient::pingReceivedCount() const { return _pingReceivedCount; }
-
-uint32_t AtanstackClient::pongPublishedCount() const { return _pongPublishedCount; }
-
-uint32_t AtanstackClient::pongPublishFailCount() const { return _pongPublishFailCount; }
-
-const char* AtanstackClient::lastPingRequestId() const {
-  return _lastPingRequestId.length() == 0 ? "" : _lastPingRequestId.c_str();
-}
-
-unsigned long AtanstackClient::lastPingReceivedMs() const {
-  return _lastPingReceivedMs;
-}
 
 void AtanstackClient::onMqttMessage(char* topic, byte* payload, unsigned int length) {
   if (_activeInstance == nullptr) {
@@ -606,14 +571,7 @@ void AtanstackClient::handleMqttMessage(char* topic, byte* payload, unsigned int
     const char* requestId =
         doc["request_id"].is<const char*>() ? doc["request_id"].as<const char*>()
                                              : nullptr;
-    _pingReceivedCount += 1;
-    _lastPingReceivedMs = millis();
-    _lastPingRequestId = requestId == nullptr ? "" : requestId;
-    if (publishPong(requestId)) {
-      _pongPublishedCount += 1;
-    } else {
-      _pongPublishFailCount += 1;
-    }
+    publishPong(requestId);
     return;
   }
 }
