@@ -18,7 +18,6 @@ struct AtanstackConfig {
   unsigned long reconnectIntervalMs;
 
   AtanstackConfig()
-      // : brokerHost("192.168.1.52"),
       : brokerHost("mqtt.hrzhkm.xyz"),
         brokerPort(1883),
         devicePid(""),

@@ -35,8 +35,8 @@ void setup() {
   connectWifi();
 
   AtanstackConfig config;
-  config.devicePid = "ATN-973Q-KCLL-KBMF";
-  config.deviceSecret = "PBuEZjk4mUFRLKmfnH5ZEUEWAARITC4tm8tp8b6b";
+  config.devicePid = "ATN-6TGQ-8V6T-VXPU";
+  config.deviceSecret = "8V5YiW4rz4hqhNnlVnnW2sZiQ0tqebSFFc7aRUTm";
 
   if (!atanstack.begin(config)) {
     Serial.print("atanstack: begin failed: ");

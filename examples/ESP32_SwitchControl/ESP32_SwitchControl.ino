@@ -15,15 +15,22 @@ AtanstackClient atanstack(wifiClient);
 const uint8_t SWITCH_GPIO_1 = 2;
 const uint8_t SWITCH_GPIO_2 = 4;
 const uint8_t SWITCH_GPIO_3 = 5;
+const uint8_t STATUS_LED_GPIO = 8;
 
 void connectWifi() {
   Serial.print("wifi: connecting to ");
   Serial.println(WIFI_SSID);
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  bool ledOn = false;
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
-    delay(500);
+    ledOn = !ledOn;
+    digitalWrite(STATUS_LED_GPIO, ledOn ? LOW : HIGH);
+    delay(250);
   }
+  digitalWrite(STATUS_LED_GPIO, LOW);
   Serial.println();
   Serial.print("wifi: connected, ip=");
   Serial.println(WiFi.localIP());
@@ -41,11 +48,14 @@ void setup() {
   delay(500);
   Serial.println("atanstack: boot switch control");
 
+  pinMode(STATUS_LED_GPIO, OUTPUT);
+  digitalWrite(STATUS_LED_GPIO, HIGH);
+
   connectWifi();
 
   AtanstackConfig config;
-  config.devicePid = "ATN-973Q-KCLL-KBMF";
-  config.deviceSecret = "cnovyTvTA1EzymRfdvEoowQ4U8Yna6GXESFRtTN3";
+  config.devicePid = "";
+  config.deviceSecret = "";
 
   if (!atanstack.begin(config)) {
     Serial.print("atanstack: begin failed: ");
