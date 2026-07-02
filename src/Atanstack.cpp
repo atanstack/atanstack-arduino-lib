@@ -470,22 +470,39 @@ bool AtanstackClient::publishSwitchCapability(uint8_t slotIndex,
   if (capability.isNull()) {
     return false;
   }
+  String controlId;
+  buildSwitchControlId(slotIndex, controlId);
+  capability["control_id"] = controlId;
+  capability["active_low"] = activeLevel == LOW;
+  capability["control"] = "switch";
+  return send("capability-switch", capability);
+}
+
+void AtanstackClient::buildSwitchControlId(uint8_t slotIndex, String& outControlId) const {
   const String deviceId = String(_config.devicePid != nullptr ? _config.devicePid : "");
   const String slotTag = String((unsigned int)slotIndex + 1);
   const uint32_t hashA = fnv1aHash(deviceId);
   const uint32_t hashB = fnv1aHash(deviceId + "-" + slotTag);
   const uint32_t slotCode = (uint32_t)slotIndex + 1u;
 
-  String controlId = "switch-";
-  appendBase36Chunk(controlId, hashA);
-  controlId += "-";
-  appendBase36Chunk(controlId, hashB);
-  controlId += "-";
-  appendPaddedBase36Chunk(controlId, slotCode);
-  capability["control_id"] = controlId;
-  capability["active_low"] = activeLevel == LOW;
-  capability["control"] = "switch";
-  return send("capability-switch", capability);
+  outControlId = "switch-";
+  appendBase36Chunk(outControlId, hashA);
+  outControlId += "-";
+  appendBase36Chunk(outControlId, hashB);
+  outControlId += "-";
+  appendPaddedBase36Chunk(outControlId, slotCode);
+}
+
+bool AtanstackClient::publishSwitchState(uint8_t slotIndex, bool on) {
+  JsonObject state = data("gpio", (int)_switchSlots[slotIndex].gpio);
+  if (state.isNull()) {
+    return false;
+  }
+  String controlId;
+  buildSwitchControlId(slotIndex, controlId);
+  state["control_id"] = controlId;
+  state["state"] = on ? "on" : "off";
+  return send("switch-state", state);
 }
 
 bool AtanstackClient::findSwitchSlotByGpio(uint8_t gpio, uint8_t& outIndex) const {
@@ -526,8 +543,7 @@ bool AtanstackClient::applySwitchState(uint8_t gpio, bool on) {
   const uint8_t onLevel = _switchSlots[slotIndex].activeLevel;
   const uint8_t offLevel = onLevel == LOW ? HIGH : LOW;
   digitalWrite(gpio, on ? onLevel : offLevel);
-  _lastError = "";
-  return true;
+  return publishSwitchState(slotIndex, on);
 }
 
 void AtanstackClient::handleMqttMessage(char* topic, byte* payload, unsigned int length) {
