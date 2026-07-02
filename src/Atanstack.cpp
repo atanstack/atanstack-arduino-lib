@@ -543,9 +543,7 @@ bool AtanstackClient::applySwitchState(uint8_t gpio, bool on) {
   const uint8_t onLevel = _switchSlots[slotIndex].activeLevel;
   const uint8_t offLevel = onLevel == LOW ? HIGH : LOW;
   digitalWrite(gpio, on ? onLevel : offLevel);
-  publishSwitchState(slotIndex, on);
-  _lastError = "";
-  return true;
+  return publishSwitchState(slotIndex, on);
 }
 
 void AtanstackClient::handleMqttMessage(char* topic, byte* payload, unsigned int length) {

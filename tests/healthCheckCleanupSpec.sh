@@ -52,5 +52,6 @@ assert_present '/commands/ping' "$SOURCE_PATH"
 assert_present '/status/pong' "$SOURCE_PATH"
 assert_present_fixed 'publishPong(' "$SOURCE_PATH"
 assert_present 'subscribe_ping_failed' "$SOURCE_PATH"
+assert_present_fixed 'return publishSwitchState(slotIndex, on);' "$SOURCE_PATH"
 
 echo "health check cleanup spec passed"
