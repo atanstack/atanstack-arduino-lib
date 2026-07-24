@@ -13,6 +13,8 @@ Arduino library for publishing device events from ESP32/ESP8266 to AtanStack dat
 - Uses per-device MQTT credentials (`devicePid` + `deviceSecret`).
 - Default topic format:
   - `atanstack/v1/devices/{devicePid}/events/{eventType}`
+- Secure cloud connection through MQTT over WebSocket:
+  - `wss://mqtt.atanstack.com/mqtt`
 
 ## Installation
 
@@ -20,24 +22,34 @@ Install dependencies from Arduino Library Manager:
 
 - `PubSubClient`
 - `ArduinoJson`
+- `ArduinoHttpClient`
 
 Then add this library as ZIP or through Library Manager once published.
 
-## Basic Usage
+## AtanStack Cloud
+
+Standard `PubSubClient` only speaks raw MQTT. AtanStack Cloud is exposed
+through secure WebSocket. `AtanstackClient` enables that transport when
+`webSocketPath` is configured:
 
 ```cpp
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <Atanstack.h>
 
-WiFiClient wifiClient;
-AtanstackClient atanstack(wifiClient);
+WiFiClientSecure webSocketClient;
+AtanstackClient atanstack(webSocketClient);
 
 void setup() {
+  // Connect Wi-Fi and synchronize system time before TLS.
+  // AtanstackClient configures AtanStack Cloud's trusted CA.
+
   AtanstackConfig config;
+  config.brokerHost = "mqtt.atanstack.com";
+  config.brokerPort = 443;
+  config.webSocketPath = "/mqtt";
   config.devicePid = "ATN-XXXX-XXXX-XXXX";
   config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
-  // optional override if broker username differs from devicePid
-  // config.mqttUsername = "ATN-XXXX-XXXX-XXXX";
 
   atanstack.begin(config);
   atanstack.connect();
@@ -52,6 +64,15 @@ void loop() {
   atanstack.send("sensor-data", data, meta);
 }
 ```
+
+See `examples/esp32CloudSend` for a complete certificate-validated ESP32
+sketch.
+
+## Raw MQTT
+
+For a LAN broker or directly exposed MQTT TLS listener, pass the matching
+`WiFiClient` or `WiFiClientSecure` directly to `AtanstackClient`. Public
+`mqtt.atanstack.com` ports `1883` and `8883` are not currently exposed.
 
 ## Multiple Event Objects
 
@@ -93,7 +114,7 @@ Every send publishes:
 
 ## Notes
 
-- `timestamp` is currently a placeholder RFC3339 value.
+- Synchronize the device clock before a TLS connection.
 - Call `atanstack.loop()` continuously.
 - Check `atanstack.lastError()` for failure reason.
 

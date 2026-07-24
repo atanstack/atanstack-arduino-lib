@@ -5,13 +5,20 @@
 // The built-in LED mirrors the pump state as a local status indicator.
 
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <Atanstack.h>
 
-const char* WIFI_SSID = "UBA_2.4G";
-const char* WIFI_PASSWORD = "izhanhebat123";
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* DEVICE_PID = "ATN-XXXX-XXXX-XXXX";
+const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
-WiFiClient wifiClient;
-AtanstackClient atanstack(wifiClient);
+const char* MQTT_HOST = "mqtt.atanstack.com";
+const uint16_t MQTT_PORT = 443;
+const char* MQTT_PATH = "/mqtt";
+
+WiFiClientSecure webSocketClient;
+AtanstackClient atanstack(webSocketClient);
 
 unsigned long lastHeartbeatMs = 0;
 
@@ -58,12 +65,18 @@ void connectWifi() {
   Serial.print("wifi: connected, ip=");
   Serial.println(WiFi.localIP());
   IPAddress brokerIp;
-  if (WiFi.hostByName("mqtt.hrzhkm.xyz", brokerIp)) {
-    Serial.print("dns: mqtt.hrzhkm.xyz -> ");
+  if (WiFi.hostByName(MQTT_HOST, brokerIp)) {
+    Serial.print("dns: mqtt.atanstack.com -> ");
     Serial.println(brokerIp);
   } else {
-    Serial.println("dns: failed resolving mqtt.hrzhkm.xyz");
+    Serial.println("dns: failed resolving mqtt.atanstack.com");
   }
+}
+
+bool syncClock() {
+  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+  struct tm timeInfo;
+  return getLocalTime(&timeInfo, 20000);
 }
 
 void setup() {
@@ -76,10 +89,20 @@ void setup() {
   digitalWrite(LED_PIN, LED_OFF);
 
   connectWifi();
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+  if (!syncClock()) {
+    Serial.println("clock sync failed; TLS connection stopped");
+    return;
+  }
 
   AtanstackConfig config;
-  config.devicePid = "";
-  config.deviceSecret = "";
+  config.brokerHost = MQTT_HOST;
+  config.brokerPort = MQTT_PORT;
+  config.webSocketPath = MQTT_PATH;
+  config.devicePid = DEVICE_PID;
+  config.deviceSecret = DEVICE_SECRET;
 
   if (!atanstack.begin(config)) {
     Serial.print("atanstack: begin failed: ");

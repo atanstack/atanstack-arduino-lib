@@ -2,9 +2,71 @@
 #define ATANSTACK_MQTT_H
 
 #include <Arduino.h>
+#include <ArduinoHttpClient.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
+#include <new>
 #include <time.h>
+
+#if defined(ARDUINO_ARCH_ESP32)
+#include <WiFiClientSecure.h>
+#endif
+
+class AtanstackWebSocketClient : public Client {
+ public:
+  AtanstackWebSocketClient(Client& tlsClient, const char* host, uint16_t port,
+                           const char* path)
+      : _webSocket(tlsClient, host, port), _path(path) {}
+
+  int connect(IPAddress, uint16_t) override {
+    return _webSocket.begin(_path) == 0 ? 1 : 0;
+  }
+
+  int connect(const char*, uint16_t) override {
+    return _webSocket.begin(_path) == 0 ? 1 : 0;
+  }
+
+  size_t write(uint8_t value) override { return write(&value, 1); }
+
+  size_t write(const uint8_t* buffer, size_t size) override {
+    if (!connected() || _webSocket.beginMessage(TYPE_BINARY) != 0) {
+      return 0;
+    }
+
+    const size_t written = _webSocket.write(buffer, size);
+    return _webSocket.endMessage() == 0 ? written : 0;
+  }
+
+  int available() override {
+    if (!connected()) {
+      return 0;
+    }
+    if (_webSocket.available() == 0) {
+      _webSocket.parseMessage();
+    }
+    return _webSocket.available();
+  }
+
+  int read() override { return available() > 0 ? _webSocket.read() : -1; }
+
+  int read(uint8_t* buffer, size_t size) override {
+    return available() > 0 ? _webSocket.read(buffer, size) : -1;
+  }
+
+  int peek() override { return available() > 0 ? _webSocket.peek() : -1; }
+
+  void flush() override { _webSocket.flush(); }
+
+  void stop() override { _webSocket.stop(); }
+
+  uint8_t connected() override { return _webSocket.connected(); }
+
+  operator bool() override { return connected(); }
+
+ private:
+  WebSocketClient _webSocket;
+  const char* _path;
+};
 
 struct AtanstackConfig {
   const char* brokerHost;
@@ -14,6 +76,7 @@ struct AtanstackConfig {
   const char* mqttUsername;
   const char* clientId;
   const char* topicBase;
+  const char* webSocketPath;
   size_t maxPayloadBytes;
   unsigned long reconnectIntervalMs;
 
@@ -25,6 +88,7 @@ struct AtanstackConfig {
         mqttUsername(""),
         clientId(""),
         topicBase("atanstack/v1/devices"),
+        webSocketPath(nullptr),
         maxPayloadBytes(512),
         reconnectIntervalMs(5000) {}
 };
@@ -35,6 +99,12 @@ class AtanstackClient {
   static const uint8_t high = HIGH;
 
   explicit AtanstackClient(Client& networkClient);
+#if defined(ARDUINO_ARCH_ESP32)
+  explicit AtanstackClient(WiFiClientSecure& networkClient);
+#endif
+  ~AtanstackClient();
+  AtanstackClient(const AtanstackClient&) = delete;
+  AtanstackClient& operator=(const AtanstackClient&) = delete;
 
   bool begin(const AtanstackConfig& config);
   bool connect();
@@ -70,6 +140,11 @@ class AtanstackClient {
     bool used;
   };
 
+  Client* _networkClient;
+#if defined(ARDUINO_ARCH_ESP32)
+  WiFiClientSecure* _secureNetworkClient;
+#endif
+  AtanstackWebSocketClient* _webSocketClient;
   PubSubClient _mqtt;
   static AtanstackClient* _activeInstance;
   AtanstackConfig _config;

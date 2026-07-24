@@ -6,8 +6,8 @@
 #include <WiFi.h>
 #include <Atanstack.h>
 
-const char* WIFI_SSID = "UBA_2.4G";
-const char* WIFI_PASSWORD = "izhanhebat123";
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
 WiFiClient wifiClient;
 AtanstackClient atanstack(wifiClient);
@@ -15,7 +15,11 @@ AtanstackClient atanstack(wifiClient);
 const uint8_t SWITCH_GPIO_1 = 2;
 const uint8_t SWITCH_GPIO_2 = 4;
 const uint8_t SWITCH_GPIO_3 = 5;
+#if CONFIG_IDF_TARGET_ESP32C3
 const uint8_t STATUS_LED_GPIO = 8;
+#else
+const uint8_t STATUS_LED_GPIO = 13;
+#endif
 
 void connectWifi() {
   Serial.print("wifi: connecting to ");
@@ -54,8 +58,8 @@ void setup() {
   connectWifi();
 
   AtanstackConfig config;
-  config.devicePid = "";
-  config.deviceSecret = "";
+  config.devicePid = "ATN-XXXX-XXXX-XXXX";
+  config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
 
   if (!atanstack.begin(config)) {
     Serial.print("atanstack: begin failed: ");

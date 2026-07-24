@@ -7,8 +7,8 @@
 #include <ArduinoJson.h>
 #include <Atanstack.h>
 
-const char* WIFI_SSID = "UBA_2.4G";
-const char* WIFI_PASSWORD = "izhanhebat123";
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
 WiFiClient wifiClient;
 AtanstackClient atanstack(wifiClient);
@@ -35,8 +35,8 @@ void setup() {
   connectWifi();
 
   AtanstackConfig config;
-  config.devicePid = "ATN-6TGQ-8V6T-VXPU";
-  config.deviceSecret = "8V5YiW4rz4hqhNnlVnnW2sZiQ0tqebSFFc7aRUTm";
+  config.devicePid = "ATN-XXXX-XXXX-XXXX";
+  config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
 
   if (!atanstack.begin(config)) {
     Serial.print("atanstack: begin failed: ");
