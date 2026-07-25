@@ -8,6 +8,12 @@ PUMP_SKETCH_PATH="$ROOT_DIR/examples/ESP32C3_PumpControl/ESP32C3_PumpControl.ino
 
 rg -Fq 'WiFi.mode(WIFI_STA);' "$SKETCH_PATH"
 rg -Fq 'WiFi.setTxPower(WIFI_POWER_8_5dBm);' "$SKETCH_PATH"
+rg -Fq 'AtanstackClient atanstack;' "$SKETCH_PATH"
+if rg -Fq 'WiFiClient wifiClient' "$SKETCH_PATH" ||
+  rg -Fq 'AtanstackClient atanstack(' "$SKETCH_PATH"; then
+  echo "ESP32 switch example injects a network client" >&2
+  exit 1
+fi
 rg -Fq '#if CONFIG_IDF_TARGET_ESP32C3' "$SKETCH_PATH"
 rg -Fq 'const uint8_t STATUS_LED_GPIO = 8;' "$SKETCH_PATH"
 rg -Fq 'const uint8_t STATUS_LED_GPIO = 13;' "$SKETCH_PATH"

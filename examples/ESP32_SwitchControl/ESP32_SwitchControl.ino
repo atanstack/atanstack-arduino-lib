@@ -11,8 +11,7 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 const char* DEVICE_PID = "ATN-XXXX-XXXX-XXXX";
 const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
-WiFiClient wifiClient;
-AtanstackClient atanstack(wifiClient);
+AtanstackClient atanstack;
 
 const uint8_t SWITCH_GPIO_1 = 2;
 const uint8_t SWITCH_GPIO_2 = 4;
@@ -40,13 +39,6 @@ void connectWifi() {
   Serial.println();
   Serial.print("wifi: connected, ip=");
   Serial.println(WiFi.localIP());
-  IPAddress brokerIp;
-  if (WiFi.hostByName("mqtt.hrzhkm.xyz", brokerIp)) {
-    Serial.print("dns: mqtt.hrzhkm.xyz -> ");
-    Serial.println(brokerIp);
-  } else {
-    Serial.println("dns: failed resolving mqtt.hrzhkm.xyz");
-  }
 }
 
 void setup() {

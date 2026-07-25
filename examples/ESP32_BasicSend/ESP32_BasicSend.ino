@@ -12,8 +12,7 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 const char* DEVICE_PID = "ATN-XXXX-XXXX-XXXX";
 const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
-WiFiClient wifiClient;
-AtanstackClient atanstack(wifiClient);
+AtanstackClient atanstack;
 
 int countData = 1;
 
