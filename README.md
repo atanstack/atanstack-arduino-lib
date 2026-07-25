@@ -5,7 +5,7 @@ Arduino library for publishing device events from ESP32/ESP8266 to AtanStack dat
 ## Features
 
 - Simple API:
-  - `atanstack.begin(config)`
+  - `atanstack.begin(devicePid, deviceSecret)`
   - `atanstack.send(eventType, dataJson, metaJson?)`
 - Lightweight JSON builders:
   - `atanstack.data(key, value)`
@@ -42,11 +42,7 @@ void setup() {
   // Connect Wi-Fi and synchronize system time before TLS.
   // AtanstackClient configures AtanStack Cloud's trusted CA.
 
-  AtanstackConfig config;
-  config.devicePid = "ATN-XXXX-XXXX-XXXX";
-  config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
-
-  atanstack.begin(config);
+  atanstack.begin("ATN-XXXX-XXXX-XXXX", "REPLACE_WITH_DEVICE_SECRET");
   atanstack.connect();
 }
 

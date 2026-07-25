@@ -117,6 +117,13 @@ AtanstackClient::~AtanstackClient() {
   }
 }
 
+bool AtanstackClient::begin(const char* devicePid, const char* deviceSecret) {
+  AtanstackConfig config;
+  config.devicePid = devicePid;
+  config.deviceSecret = deviceSecret;
+  return begin(config);
+}
+
 bool AtanstackClient::begin(const AtanstackConfig& config) {
   if (!validateConfig(config)) {
     return false;

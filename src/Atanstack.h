@@ -170,6 +170,7 @@ class AtanstackClient {
   AtanstackClient(const AtanstackClient&) = delete;
   AtanstackClient& operator=(const AtanstackClient&) = delete;
 
+  bool begin(const char* devicePid, const char* deviceSecret);
   bool begin(const AtanstackConfig& config);
   bool connect();
   void loop();

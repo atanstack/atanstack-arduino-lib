@@ -89,11 +89,7 @@ void setup() {
     return;
   }
 
-  AtanstackConfig config;
-  config.devicePid = DEVICE_PID;
-  config.deviceSecret = DEVICE_SECRET;
-
-  if (!atanstack.begin(config)) {
+  if (!atanstack.begin(DEVICE_PID, DEVICE_SECRET)) {
     Serial.print("atanstack: begin failed: ");
     Serial.println(atanstack.lastError());
     return;

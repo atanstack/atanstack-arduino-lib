@@ -8,10 +8,6 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 const char* DEVICE_PID = "ATN-XXXX-XXXX-XXXX";
 const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
-const char* MQTT_HOST = "mqtt.atanstack.com";
-const uint16_t MQTT_PORT = 443;
-const char* MQTT_PATH = "/mqtt";
-
 AtanstackClient atanstack;
 
 unsigned long lastSendMs = 0;
@@ -36,14 +32,7 @@ void setup() {
     return;
   }
 
-  AtanstackConfig config;
-  config.brokerHost = MQTT_HOST;
-  config.brokerPort = MQTT_PORT;
-  config.webSocketPath = MQTT_PATH;
-  config.devicePid = DEVICE_PID;
-  config.deviceSecret = DEVICE_SECRET;
-
-  if (!atanstack.begin(config) || !atanstack.connect()) {
+  if (!atanstack.begin(DEVICE_PID, DEVICE_SECRET) || !atanstack.connect()) {
     Serial.println(atanstack.lastError());
   }
 }

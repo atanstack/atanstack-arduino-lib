@@ -9,6 +9,8 @@
 
 const char* WIFI_SSID = "YOUR_WIFI_SSID";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* DEVICE_PID = "ATN-XXXX-XXXX-XXXX";
+const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
 WiFiClient wifiClient;
 AtanstackClient atanstack(wifiClient);
@@ -34,11 +36,7 @@ void setup() {
   Serial.println("atanstack: boot");
   connectWifi();
 
-  AtanstackConfig config;
-  config.devicePid = "ATN-XXXX-XXXX-XXXX";
-  config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
-
-  if (!atanstack.begin(config)) {
+  if (!atanstack.begin(DEVICE_PID, DEVICE_SECRET)) {
     Serial.print("atanstack: begin failed: ");
     Serial.println(atanstack.lastError());
     return;
