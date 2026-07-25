@@ -52,13 +52,12 @@ void appendPaddedBase36Chunk(String& out, uint32_t value) {
 }
 }  // namespace
 
-AtanstackClient::AtanstackClient(Client& networkClient)
-    : _networkClient(&networkClient),
 #if defined(ARDUINO_ARCH_ESP32)
-      _secureNetworkClient(nullptr),
-#endif
+AtanstackClient::AtanstackClient()
+    : _networkClient(&_defaultNetworkClient),
+      _secureNetworkClient(&_defaultNetworkClient),
       _webSocketClient(nullptr),
-      _mqtt(networkClient),
+      _mqtt(_defaultNetworkClient),
       _lastReconnectAttemptMs(0),
       _ntpInitAttempted(false),
       _lastNtpAttemptMs(0),
@@ -74,10 +73,36 @@ AtanstackClient::AtanstackClient(Client& networkClient)
   }
 }
 
-#if defined(ARDUINO_ARCH_ESP32)
+AtanstackClient::AtanstackClient(Client& networkClient) : AtanstackClient() {
+  _networkClient = &networkClient;
+  _secureNetworkClient = nullptr;
+  _mqtt.setClient(networkClient);
+}
+
 AtanstackClient::AtanstackClient(WiFiClientSecure& networkClient)
-    : AtanstackClient(static_cast<Client&>(networkClient)) {
+    : AtanstackClient() {
+  _networkClient = &networkClient;
   _secureNetworkClient = &networkClient;
+  _mqtt.setClient(networkClient);
+}
+#else
+AtanstackClient::AtanstackClient(Client& networkClient)
+    : _networkClient(&networkClient),
+      _webSocketClient(nullptr),
+      _mqtt(networkClient),
+      _lastReconnectAttemptMs(0),
+      _ntpInitAttempted(false),
+      _lastNtpAttemptMs(0),
+      _lastError(""),
+      _nextDataSlot(0),
+      _nextMetaSlot(0) {
+  for (uint8_t i = 0; i < kSlotCount; ++i) {
+    _dataSlots[i] = nullptr;
+    _metaSlots[i] = nullptr;
+    _switchSlots[i].gpio = 0;
+    _switchSlots[i].activeLevel = LOW;
+    _switchSlots[i].used = false;
+  }
 }
 #endif
 

@@ -34,20 +34,15 @@ through secure WebSocket. `AtanstackClient` enables that transport when
 
 ```cpp
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
 #include <Atanstack.h>
 
-WiFiClientSecure webSocketClient;
-AtanstackClient atanstack(webSocketClient);
+AtanstackClient atanstack;
 
 void setup() {
   // Connect Wi-Fi and synchronize system time before TLS.
   // AtanstackClient configures AtanStack Cloud's trusted CA.
 
   AtanstackConfig config;
-  config.brokerHost = "mqtt.atanstack.com";
-  config.brokerPort = 443;
-  config.webSocketPath = "/mqtt";
   config.devicePid = "ATN-XXXX-XXXX-XXXX";
   config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
 
@@ -71,7 +66,8 @@ sketch.
 ## Raw MQTT
 
 For a LAN broker or directly exposed MQTT TLS listener, pass the matching
-`WiFiClient` or `WiFiClientSecure` directly to `AtanstackClient`. Public
+`WiFiClient` or `WiFiClientSecure` directly to `AtanstackClient` and override
+`brokerHost`, `brokerPort`, and `webSocketPath`. Public
 `mqtt.atanstack.com` ports `1883` and `8883` are not currently exposed.
 
 ## Multiple Event Objects

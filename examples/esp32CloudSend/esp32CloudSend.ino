@@ -1,7 +1,6 @@
 // ESP32 -> AtanStack Cloud using MQTT over secure WebSocket.
 
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
 #include <Atanstack.h>
 
 const char* WIFI_SSID = "YOUR_WIFI_SSID";
@@ -13,8 +12,7 @@ const char* MQTT_HOST = "mqtt.atanstack.com";
 const uint16_t MQTT_PORT = 443;
 const char* MQTT_PATH = "/mqtt";
 
-WiFiClientSecure webSocketClient;
-AtanstackClient atanstack(webSocketClient);
+AtanstackClient atanstack;
 
 unsigned long lastSendMs = 0;
 

@@ -5,20 +5,14 @@
 // The built-in LED mirrors the pump state as a local status indicator.
 
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
 #include <Atanstack.h>
 
-const char* WIFI_SSID = "YOUR_WIFI_SSID";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* WIFI_SSID = "UBA_2.4G";
+const char* WIFI_PASSWORD = "izhanhebat123";
 const char* DEVICE_PID = "ATN-XXXX-XXXX-XXXX";
 const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
-const char* MQTT_HOST = "mqtt.atanstack.com";
-const uint16_t MQTT_PORT = 443;
-const char* MQTT_PATH = "/mqtt";
-
-WiFiClientSecure webSocketClient;
-AtanstackClient atanstack(webSocketClient);
+AtanstackClient atanstack;
 
 unsigned long lastHeartbeatMs = 0;
 
@@ -64,13 +58,6 @@ void connectWifi() {
 
   Serial.print("wifi: connected, ip=");
   Serial.println(WiFi.localIP());
-  IPAddress brokerIp;
-  if (WiFi.hostByName(MQTT_HOST, brokerIp)) {
-    Serial.print("dns: mqtt.atanstack.com -> ");
-    Serial.println(brokerIp);
-  } else {
-    Serial.println("dns: failed resolving mqtt.atanstack.com");
-  }
 }
 
 bool syncClock() {
@@ -80,6 +67,11 @@ bool syncClock() {
 }
 
 void setup() {
+  // Preload the inactive level before enabling output to avoid an active-low
+  // glitch while Wi-Fi, time, and MQTT initialize.
+  digitalWrite(PUMP_PIN, RELAY_OFF);
+  pinMode(PUMP_PIN, OUTPUT);
+
   Serial.begin(115200);
   delay(500);
   Serial.println("atanstack: boot pump control");
@@ -98,9 +90,6 @@ void setup() {
   }
 
   AtanstackConfig config;
-  config.brokerHost = MQTT_HOST;
-  config.brokerPort = MQTT_PORT;
-  config.webSocketPath = MQTT_PATH;
   config.devicePid = DEVICE_PID;
   config.deviceSecret = DEVICE_SECRET;
 
