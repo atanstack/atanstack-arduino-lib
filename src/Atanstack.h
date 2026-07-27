@@ -154,6 +154,31 @@ struct AtanstackConfig {
         reconnectIntervalMs(5000) {}
 };
 
+class AtanstackClient;
+
+class AtanstackEvent {
+ public:
+  template <typename T>
+  AtanstackEvent& data(const char* key, const T& value);
+
+  template <typename T>
+  AtanstackEvent& meta(const char* key, const T& value);
+
+  bool send();
+
+ private:
+  friend class AtanstackClient;
+
+  AtanstackEvent(AtanstackClient& client, const char* eventType);
+
+  AtanstackClient* _client;
+  const char* _eventType;
+  JsonObject _data;
+  JsonObject _meta;
+  bool _valid;
+  bool _hasData;
+};
+
 class AtanstackClient {
  public:
   static const uint8_t low = LOW;
@@ -175,6 +200,8 @@ class AtanstackClient {
   bool connect();
   void loop();
   bool connected();
+
+  AtanstackEvent event(const char* eventType);
 
   JsonObject data(const char* key, const char* value);
   JsonObject data(const char* key, const String& value);
@@ -198,6 +225,8 @@ class AtanstackClient {
   int mqttState();
 
  private:
+  friend class AtanstackEvent;
+
   static const uint8_t kSlotCount = 8;
   struct SwitchSlot {
     uint8_t gpio;
@@ -249,5 +278,26 @@ class AtanstackClient {
   void ensureClockSynced();
   void setError(const char* message);
 };
+
+template <typename T>
+AtanstackEvent& AtanstackEvent::data(const char* key, const T& value) {
+  if (!_valid || !_client->validateKey(key)) {
+    _valid = false;
+    return *this;
+  }
+  _data[key] = value;
+  _hasData = true;
+  return *this;
+}
+
+template <typename T>
+AtanstackEvent& AtanstackEvent::meta(const char* key, const T& value) {
+  if (!_valid || !_client->validateKey(key)) {
+    _valid = false;
+    return *this;
+  }
+  _meta[key] = value;
+  return *this;
+}
 
 #endif

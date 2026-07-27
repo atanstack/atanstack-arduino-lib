@@ -8,6 +8,12 @@ arduino-cli compile \
   --fqbn esp32:esp32:esp32c3 \
   --board-options CDCOnBoot=cdc \
   --libraries "$ROOT_DIR" \
+  "$ROOT_DIR/examples/ESP32_BasicSend"
+
+arduino-cli compile \
+  --fqbn esp32:esp32:esp32c3 \
+  --board-options CDCOnBoot=cdc \
+  --libraries "$ROOT_DIR" \
   "$ROOT_DIR/examples/ESP32_SwitchControl"
 
 arduino-cli compile \

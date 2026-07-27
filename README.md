@@ -6,10 +6,7 @@ Arduino library for publishing device events from ESP32/ESP8266 to AtanStack dat
 
 - Simple API:
   - `atanstack.begin(devicePid, deviceSecret)`
-  - `atanstack.send(eventType, dataJson, metaJson?)`
-- Lightweight JSON builders:
-  - `atanstack.data(key, value)`
-  - `atanstack.meta(key, value)`
+  - `atanstack.event(eventType).data(key, value).send()`
 - Uses per-device MQTT credentials (`devicePid` + `deviceSecret`).
 - Default topic format:
   - `atanstack/v1/devices/{devicePid}/events/{eventType}`
@@ -49,10 +46,10 @@ void setup() {
 void loop() {
   atanstack.loop();
 
-  const JsonObject data = atanstack.data("temperature_c", 29.1);
-  const JsonObject meta = atanstack.meta("firmware", "0.1.0");
-
-  atanstack.send("sensor-data", data, meta);
+  atanstack.event("sensor-data")
+      .data("temperature_c", 29.1)
+      .meta("firmware", "0.1.0")
+      .send();
 }
 ```
 
@@ -69,12 +66,14 @@ For a LAN broker or directly exposed MQTT TLS listener, pass the matching
 ## Multiple Event Objects
 
 ```cpp
-const JsonObject temperature = atanstack.data("temperature_c", 29.1);
-const JsonObject temperatureMeta = atanstack.meta("firmware", "0.1.0");
-const JsonObject distance = atanstack.data("distance", 30.0);
+atanstack.event("temperature-data")
+    .data("temperature_c", 29.1)
+    .meta("firmware", "0.1.0")
+    .send();
 
-atanstack.send("sensor-data", temperature, temperatureMeta);
-atanstack.send("distance-sensor", distance);
+atanstack.event("distance-sensor")
+    .data("distance", 30.0)
+    .send();
 ```
 
 ## Supported Value Types

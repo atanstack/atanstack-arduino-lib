@@ -58,22 +58,16 @@ void loop() {
     delay(1000);
     return;
   }
-  const JsonObject count = atanstack.data("count", countData);
-  const JsonObject temperature = atanstack.data("temperature_c", 29.1);
-  const JsonObject temperature_meta = atanstack.meta("firmware", "0.1.0");
-  const JsonObject distance = atanstack.data("distance", 30.0);
+  atanstack.event("count").data("count", countData).send();
 
-  const bool sendCount = atanstack.send("count", count);
-  Serial.print("send count: ");
-  Serial.println(sendCount ? "ok" : atanstack.lastError());
+  float temperature = 23.5;
+  atanstack.event("temperature-data")
+      .data("temperature_c", temperature)
+      .meta("firmware metadata", "0.1.0")
+      .send();
 
-  const bool tempSent = atanstack.send("temperature-data", temperature, temperature_meta);
-  Serial.print("send temperature-data: ");
-  Serial.println(tempSent ? "ok" : atanstack.lastError());
-
-  const bool distanceSent = atanstack.send("distance-sensor", distance);
-  Serial.print("send distance-sensor: ");
-  Serial.println(distanceSent ? "ok" : atanstack.lastError());
+  float distance = 30.0;
+  atanstack.event("distance-sensor").data("distance", distance).send();
 
   countData++;
   delay(5000);

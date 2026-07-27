@@ -35,9 +35,9 @@ void setup() {
 void loop() {
   atanstack.loop();
 
-  const JsonObject data = atanstack.data("humidity_pct", 67.4);
-  const JsonObject meta = atanstack.meta("relay_on", true);
-
-  atanstack.send("sensor-data", data, meta);
+  atanstack.event("sensor-data")
+      .data("humidity_pct", 67.4)
+      .meta("relay_on", true)
+      .send();
   delay(5000);
 }

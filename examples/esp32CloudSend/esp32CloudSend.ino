@@ -45,12 +45,14 @@ void loop() {
   }
 
   lastSendMs = millis();
-  JsonObject reading = atanstack.data("temperature_c", 26.75);
-  reading["humidity_pct"] = 68;
-  JsonObject details = atanstack.meta("firmware", "esp32-cloud-1.0.0");
-  details["transport"] = "mqtt-wss";
-
-  if (!atanstack.send("environment", reading, details)) {
+  if (!atanstack.event("environment")
+           .data("temperature_c", 26.75f)
+           .data("humidity_pct", 68)
+           .meta("firmware", "esp32-cloud-1.0.0")
+           .meta("transport", String("mqtt-wss"))
+           .meta("uptime_ms", (long)millis())
+           .meta("connected", true)
+           .send()) {
     Serial.println(atanstack.lastError());
   }
 }

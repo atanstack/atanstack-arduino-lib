@@ -234,6 +234,29 @@ void AtanstackClient::loop() {
 
 bool AtanstackClient::connected() { return _mqtt.connected(); }
 
+AtanstackEvent::AtanstackEvent(AtanstackClient& client, const char* eventType)
+    : _client(&client),
+      _eventType(eventType),
+      _data(client.nextDataObject()),
+      _meta(client.nextMetaObject()),
+      _valid(!_data.isNull() && !_meta.isNull()),
+      _hasData(false) {}
+
+bool AtanstackEvent::send() {
+  if (!_valid) {
+    return false;
+  }
+  if (!_hasData) {
+    _client->setError("missing_data");
+    return false;
+  }
+  return _client->send(_eventType, _data, _meta);
+}
+
+AtanstackEvent AtanstackClient::event(const char* eventType) {
+  return AtanstackEvent(*this, eventType);
+}
+
 JsonObject AtanstackClient::data(const char* key, const char* value) {
   if (!validateKey(key)) {
     return JsonObject();
