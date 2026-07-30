@@ -7,13 +7,20 @@
 #include <ArduinoJson.h>
 #include <Atanstack.h>
 
-const char* WIFI_SSID = "UBA_2.4G";
-const char* WIFI_PASSWORD = "izhanhebat123";
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* DEVICE_PID = "ATN-XXXX-XXXX-XXXX";
+const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
-WiFiClient wifiClient;
-AtanstackClient atanstack(wifiClient);
+AtanstackClient atanstack;
 
 int countData = 1;
+
+bool syncClock() {
+  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+  struct tm timeInfo;
+  return getLocalTime(&timeInfo, 20000);
+}
 
 void connectWifi() {
   Serial.print("wifi: connecting to ");
@@ -34,11 +41,12 @@ void setup() {
   Serial.println("atanstack: boot");
   connectWifi();
 
-  AtanstackConfig config;
-  config.devicePid = "ATN-6TGQ-8V6T-VXPU";
-  config.deviceSecret = "8V5YiW4rz4hqhNnlVnnW2sZiQ0tqebSFFc7aRUTm";
+  if (!syncClock()) {
+    Serial.println("clock sync failed; TLS connection stopped");
+    return;
+  }
 
-  if (!atanstack.begin(config)) {
+  if (!atanstack.begin(DEVICE_PID, DEVICE_SECRET)) {
     Serial.print("atanstack: begin failed: ");
     Serial.println(atanstack.lastError());
     return;
@@ -61,22 +69,16 @@ void loop() {
     delay(1000);
     return;
   }
-  const JsonObject count = atanstack.data("count", countData);
-  const JsonObject temperature = atanstack.data("temperature_c", 29.1);
-  const JsonObject temperature_meta = atanstack.meta("firmware", "0.1.0");
-  const JsonObject distance = atanstack.data("distance", 30.0);
+  atanstack.event("count").data("count", countData).send();
 
-  const bool sendCount = atanstack.send("count", count);
-  Serial.print("send count: ");
-  Serial.println(sendCount ? "ok" : atanstack.lastError());
+  float temperature = 23.5;
+  atanstack.event("temperature-data")
+      .data("temperature_c", temperature)
+      .meta("firmware metadata", "0.1.0")
+      .send();
 
-  const bool tempSent = atanstack.send("temperature-data", temperature, temperature_meta);
-  Serial.print("send temperature-data: ");
-  Serial.println(tempSent ? "ok" : atanstack.lastError());
-
-  const bool distanceSent = atanstack.send("distance-sensor", distance);
-  Serial.print("send distance-sensor: ");
-  Serial.println(distanceSent ? "ok" : atanstack.lastError());
+  float distance = 30.0;
+  atanstack.event("distance-sensor").data("distance", distance).send();
 
   countData++;
   delay(5000);

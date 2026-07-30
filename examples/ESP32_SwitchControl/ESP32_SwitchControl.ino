@@ -6,16 +6,27 @@
 #include <WiFi.h>
 #include <Atanstack.h>
 
-const char* WIFI_SSID = "UBA_2.4G";
-const char* WIFI_PASSWORD = "izhanhebat123";
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+const char* DEVICE_PID = "ATN-XXXX-XXXX-XXXX";
+const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
-WiFiClient wifiClient;
-AtanstackClient atanstack(wifiClient);
+AtanstackClient atanstack;
+
+bool syncClock() {
+  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+  struct tm timeInfo;
+  return getLocalTime(&timeInfo, 20000);
+}
 
 const uint8_t SWITCH_GPIO_1 = 2;
 const uint8_t SWITCH_GPIO_2 = 4;
 const uint8_t SWITCH_GPIO_3 = 5;
+#if CONFIG_IDF_TARGET_ESP32C3
 const uint8_t STATUS_LED_GPIO = 8;
+#else
+const uint8_t STATUS_LED_GPIO = 13;
+#endif
 
 void connectWifi() {
   Serial.print("wifi: connecting to ");
@@ -34,13 +45,6 @@ void connectWifi() {
   Serial.println();
   Serial.print("wifi: connected, ip=");
   Serial.println(WiFi.localIP());
-  IPAddress brokerIp;
-  if (WiFi.hostByName("mqtt.hrzhkm.xyz", brokerIp)) {
-    Serial.print("dns: mqtt.hrzhkm.xyz -> ");
-    Serial.println(brokerIp);
-  } else {
-    Serial.println("dns: failed resolving mqtt.hrzhkm.xyz");
-  }
 }
 
 void setup() {
@@ -53,11 +57,12 @@ void setup() {
 
   connectWifi();
 
-  AtanstackConfig config;
-  config.devicePid = "";
-  config.deviceSecret = "";
+  if (!syncClock()) {
+    Serial.println("clock sync failed; TLS connection stopped");
+    return;
+  }
 
-  if (!atanstack.begin(config)) {
+  if (!atanstack.begin(DEVICE_PID, DEVICE_SECRET)) {
     Serial.print("atanstack: begin failed: ");
     Serial.println(atanstack.lastError());
     return;

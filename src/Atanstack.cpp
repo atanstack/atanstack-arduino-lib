@@ -3,6 +3,24 @@
 AtanstackClient* AtanstackClient::_activeInstance = nullptr;
 
 namespace {
+#if defined(ARDUINO_ARCH_ESP32)
+const char kAtanstackRootCa[] PROGMEM = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD
+VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
+A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
+WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
+IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
+AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi
+QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR
+HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
+9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8
+p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
+-----END CERTIFICATE-----
+)EOF";
+#endif
+
 uint32_t fnv1aHash(const String& value) {
   uint32_t hash = 2166136261u;
   for (size_t i = 0; i < value.length(); ++i) {
@@ -34,8 +52,12 @@ void appendPaddedBase36Chunk(String& out, uint32_t value) {
 }
 }  // namespace
 
-AtanstackClient::AtanstackClient(Client& networkClient)
-    : _mqtt(networkClient),
+#if defined(ARDUINO_ARCH_ESP32)
+AtanstackClient::AtanstackClient()
+    : _networkClient(&_defaultNetworkClient),
+      _secureNetworkClient(&_defaultNetworkClient),
+      _webSocketClient(nullptr),
+      _mqtt(_defaultNetworkClient),
       _lastReconnectAttemptMs(0),
       _ntpInitAttempted(false),
       _lastNtpAttemptMs(0),
@@ -51,12 +73,85 @@ AtanstackClient::AtanstackClient(Client& networkClient)
   }
 }
 
+AtanstackClient::AtanstackClient(Client& networkClient) : AtanstackClient() {
+  _networkClient = &networkClient;
+  _secureNetworkClient = nullptr;
+  _mqtt.setClient(networkClient);
+}
+
+AtanstackClient::AtanstackClient(WiFiClientSecure& networkClient)
+    : AtanstackClient() {
+  _networkClient = &networkClient;
+  _secureNetworkClient = &networkClient;
+  _mqtt.setClient(networkClient);
+}
+#else
+AtanstackClient::AtanstackClient(Client& networkClient)
+    : _networkClient(&networkClient),
+      _webSocketClient(nullptr),
+      _mqtt(networkClient),
+      _lastReconnectAttemptMs(0),
+      _ntpInitAttempted(false),
+      _lastNtpAttemptMs(0),
+      _lastError(""),
+      _nextDataSlot(0),
+      _nextMetaSlot(0) {
+  for (uint8_t i = 0; i < kSlotCount; ++i) {
+    _dataSlots[i] = nullptr;
+    _metaSlots[i] = nullptr;
+    _switchSlots[i].gpio = 0;
+    _switchSlots[i].activeLevel = LOW;
+    _switchSlots[i].used = false;
+  }
+}
+#endif
+
+AtanstackClient::~AtanstackClient() {
+  delete _webSocketClient;
+  for (uint8_t i = 0; i < kSlotCount; ++i) {
+    delete _dataSlots[i];
+    delete _metaSlots[i];
+  }
+  if (_activeInstance == this) {
+    _activeInstance = nullptr;
+  }
+}
+
+bool AtanstackClient::begin(const char* devicePid, const char* deviceSecret) {
+  AtanstackConfig config;
+  config.devicePid = devicePid;
+  config.deviceSecret = deviceSecret;
+  return begin(config);
+}
+
 bool AtanstackClient::begin(const AtanstackConfig& config) {
   if (!validateConfig(config)) {
     return false;
   }
 
   _config = config;
+#if defined(ARDUINO_ARCH_ESP32)
+  if (_secureNetworkClient != nullptr &&
+      strcmp(_config.brokerHost, "mqtt.atanstack.com") == 0 &&
+      _config.webSocketPath != nullptr) {
+    _secureNetworkClient->setCACert(kAtanstackRootCa);
+  }
+#endif
+  delete _webSocketClient;
+  _webSocketClient = nullptr;
+  if (_config.webSocketPath != nullptr &&
+      strlen(_config.webSocketPath) > 0) {
+    _webSocketClient = new (std::nothrow) AtanstackWebSocketClient(
+        *_networkClient, _config.brokerHost, _config.brokerPort,
+        _config.webSocketPath);
+    if (_webSocketClient == nullptr) {
+      setError("websocket_allocation_failed");
+      return false;
+    }
+    _mqtt.setClient(*_webSocketClient);
+  } else {
+    _mqtt.setClient(*_networkClient);
+  }
   _mqtt.setServer(_config.brokerHost, _config.brokerPort);
   _activeInstance = this;
   _mqtt.setCallback(AtanstackClient::onMqttMessage);
@@ -138,6 +233,29 @@ void AtanstackClient::loop() {
 }
 
 bool AtanstackClient::connected() { return _mqtt.connected(); }
+
+AtanstackEvent::AtanstackEvent(AtanstackClient& client, const char* eventType)
+    : _client(&client),
+      _eventType(eventType),
+      _data(client.nextDataObject()),
+      _meta(client.nextMetaObject()),
+      _valid(!_data.isNull() && !_meta.isNull()),
+      _hasData(false) {}
+
+bool AtanstackEvent::send() {
+  if (!_valid) {
+    return false;
+  }
+  if (!_hasData) {
+    _client->setError("missing_data");
+    return false;
+  }
+  return _client->send(_eventType, _data, _meta);
+}
+
+AtanstackEvent AtanstackClient::event(const char* eventType) {
+  return AtanstackEvent(*this, eventType);
+}
 
 JsonObject AtanstackClient::data(const char* key, const char* value) {
   if (!validateKey(key)) {

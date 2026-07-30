@@ -5,14 +5,13 @@ Arduino library for publishing device events from ESP32/ESP8266 to AtanStack dat
 ## Features
 
 - Simple API:
-  - `atanstack.begin(config)`
-  - `atanstack.send(eventType, dataJson, metaJson?)`
-- Lightweight JSON builders:
-  - `atanstack.data(key, value)`
-  - `atanstack.meta(key, value)`
+  - `atanstack.begin(devicePid, deviceSecret)`
+  - `atanstack.event(eventType).data(key, value).send()`
 - Uses per-device MQTT credentials (`devicePid` + `deviceSecret`).
 - Default topic format:
   - `atanstack/v1/devices/{devicePid}/events/{eventType}`
+- Secure cloud connection through MQTT over WebSocket:
+  - `wss://mqtt.atanstack.com/mqtt`
 
 ## Installation
 
@@ -20,48 +19,61 @@ Install dependencies from Arduino Library Manager:
 
 - `PubSubClient`
 - `ArduinoJson`
+- `ArduinoHttpClient`
 
 Then add this library as ZIP or through Library Manager once published.
 
-## Basic Usage
+## AtanStack Cloud
+
+Standard `PubSubClient` only speaks raw MQTT. AtanStack Cloud is exposed
+through secure WebSocket. `AtanstackClient` enables that transport when
+`webSocketPath` is configured:
 
 ```cpp
 #include <WiFi.h>
 #include <Atanstack.h>
 
-WiFiClient wifiClient;
-AtanstackClient atanstack(wifiClient);
+AtanstackClient atanstack;
 
 void setup() {
-  AtanstackConfig config;
-  config.devicePid = "ATN-XXXX-XXXX-XXXX";
-  config.deviceSecret = "REPLACE_WITH_DEVICE_SECRET";
-  // optional override if broker username differs from devicePid
-  // config.mqttUsername = "ATN-XXXX-XXXX-XXXX";
+  // Connect Wi-Fi and synchronize system time before TLS.
+  // AtanstackClient configures AtanStack Cloud's trusted CA.
 
-  atanstack.begin(config);
+  atanstack.begin("ATN-XXXX-XXXX-XXXX", "REPLACE_WITH_DEVICE_SECRET");
   atanstack.connect();
 }
 
 void loop() {
   atanstack.loop();
 
-  const JsonObject data = atanstack.data("temperature_c", 29.1);
-  const JsonObject meta = atanstack.meta("firmware", "0.1.0");
-
-  atanstack.send("sensor-data", data, meta);
+  atanstack.event("sensor-data")
+      .data("temperature_c", 29.1)
+      .meta("firmware", "0.1.0")
+      .send();
 }
 ```
+
+See `examples/esp32CloudSend` for a complete certificate-validated ESP32
+sketch.
+
+## Raw MQTT
+
+For a LAN broker or directly exposed MQTT TLS listener, pass the matching
+`WiFiClient` or `WiFiClientSecure` directly to `AtanstackClient` and override
+`brokerHost`, `brokerPort`, and `webSocketPath`. Public
+`mqtt.atanstack.com` ports `1883` and `8883` are not currently exposed.
 
 ## Multiple Event Objects
 
 ```cpp
-const JsonObject temperature = atanstack.data("temperature_c", 29.1);
-const JsonObject temperatureMeta = atanstack.meta("firmware", "0.1.0");
-const JsonObject distance = atanstack.data("distance", 30.0);
+atanstack.event("temperature-data")
+    .data("temperature_c", 29.1)
+    .meta("firmware", "0.1.0")
+    .send();
 
-atanstack.send("sensor-data", temperature, temperatureMeta);
-atanstack.send("distance-sensor", distance);
+atanstack.event("distance-sensor")
+    .data("distance", 30.0)
+    .send();
 ```
 
 ## Supported Value Types
@@ -93,7 +105,7 @@ Every send publishes:
 
 ## Notes
 
-- `timestamp` is currently a placeholder RFC3339 value.
+- Synchronize the device clock before a TLS connection.
 - Call `atanstack.loop()` continuously.
 - Check `atanstack.lastError()` for failure reason.
 
