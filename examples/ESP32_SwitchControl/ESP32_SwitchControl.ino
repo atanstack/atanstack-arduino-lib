@@ -13,6 +13,12 @@ const char* DEVICE_SECRET = "REPLACE_WITH_DEVICE_SECRET";
 
 AtanstackClient atanstack;
 
+bool syncClock() {
+  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+  struct tm timeInfo;
+  return getLocalTime(&timeInfo, 20000);
+}
+
 const uint8_t SWITCH_GPIO_1 = 2;
 const uint8_t SWITCH_GPIO_2 = 4;
 const uint8_t SWITCH_GPIO_3 = 5;
@@ -50,6 +56,11 @@ void setup() {
   digitalWrite(STATUS_LED_GPIO, HIGH);
 
   connectWifi();
+
+  if (!syncClock()) {
+    Serial.println("clock sync failed; TLS connection stopped");
+    return;
+  }
 
   if (!atanstack.begin(DEVICE_PID, DEVICE_SECRET)) {
     Serial.print("atanstack: begin failed: ");

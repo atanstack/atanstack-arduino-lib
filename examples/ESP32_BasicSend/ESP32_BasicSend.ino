@@ -16,6 +16,12 @@ AtanstackClient atanstack;
 
 int countData = 1;
 
+bool syncClock() {
+  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+  struct tm timeInfo;
+  return getLocalTime(&timeInfo, 20000);
+}
+
 void connectWifi() {
   Serial.print("wifi: connecting to ");
   Serial.println(WIFI_SSID);
@@ -34,6 +40,11 @@ void setup() {
   delay(500);
   Serial.println("atanstack: boot");
   connectWifi();
+
+  if (!syncClock()) {
+    Serial.println("clock sync failed; TLS connection stopped");
+    return;
+  }
 
   if (!atanstack.begin(DEVICE_PID, DEVICE_SECRET)) {
     Serial.print("atanstack: begin failed: ");
